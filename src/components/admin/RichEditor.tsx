@@ -75,6 +75,7 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
   });
 
   const handleImageUpload = useCallback(async () => {
+    alert('开始上传');
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
@@ -95,6 +96,7 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
         if (!res.ok) throw new Error(data.error || "Upload failed");
         // Validate the returned URL
         const uploadedUrl = data.url;
+        alert('拿到 URL: ' + (uploadedUrl || '空'));
         if (!uploadedUrl || typeof uploadedUrl !== "string") {
           throw new Error("服务器未返回有效的图片地址");
         }
@@ -142,7 +144,7 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
   }
 
   return (
-    <div className="border border-border rounded-xl bg-background overflow-hidden">
+    <div className="border border-border rounded-xl bg-background overflow-hidden" suppressHydrationWarning>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 border-b border-border bg-muted/5">
         <ToolbarButton
