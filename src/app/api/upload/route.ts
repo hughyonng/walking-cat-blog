@@ -4,9 +4,7 @@ import { getTokenFromRequest, verifyToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-const BLOB_TOKEN =
-  process.env.walking1544544hfhgfjgj_READ_WRITE_TOKEN ||
-  process.env.BLOB_READ_WRITE_TOKEN;
+const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 
 export async function POST(request: NextRequest) {
   // Verify authentication
@@ -41,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     const blob = await put(file.name, file, {
-      access: "private",
+      access: "public",
       addRandomSuffix: true,
       token: BLOB_TOKEN,
     });
