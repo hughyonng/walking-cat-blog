@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import RichEditor from "@/components/admin/RichEditor";
+import PostPreview from "@/components/admin/PostPreview";
 
 interface PostEditorProps {
   mode: "create" | "edit";
@@ -30,32 +32,47 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
   const [content, setContent] = useState(initialData?.content || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [preview, setPreview] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
   const [coverPreview, setCoverPreview] = useState(initialData?.coverImage || "");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  const slug = initialData?.slug || "";
+  const handleCoverUpload = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.title = "选择封面图片";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
 
-  // Debounced markdown preview
-  useEffect(() => {
-    if (!content.trim()) {
-      setPreview("");
-      return;
-    }
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const timer = setTimeout(() => {
-      setPreview(renderMarkdown(content));
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [content]);
+      try {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) throw new Error("上传失败");
+        const { url } = await res.json();
+        setCoverImage(url);
+        setCoverPreview(url);
+      } catch {
+        setError("图片上传失败，请重试");
+      } finally {
+        setUploading(false);
+      }
+    };
+    input.click();
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
-      setError("请输入标题");
+      setError("请输入文章标题");
       return;
     }
-    if (!content.trim()) {
+    if (!content.trim() || content === "<p></p>") {
       setError("请输入文章内容");
       return;
     }
@@ -94,9 +111,24 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
-      <h1 className="text-2xl font-bold tracking-tight text-foreground mb-8">
-        {isEdit ? "编辑文章" : "写新文章"}
-      </h1>
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          {isEdit ? "编辑文章" : "写新文章"}
+        </h1>
+        <button
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-border
+            text-muted hover:text-foreground hover:border-accent/30 transition-colors"
+        >
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.2">
+            <path d="M7.5 3C4.5 3 2 7.5 2 7.5S4.5 12 7.5 12 13 7.5 13 7.5 10.5 3 7.5 3z" />
+            <circle cx="7.5" cy="7.5" r="2" />
+          </svg>
+          预览
+        </button>
+      </div>
 
       <div className="space-y-5">
         {error && (
@@ -105,6 +137,7 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
           </p>
         )}
 
+        {/* Title + Date row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -133,6 +166,7 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
           </div>
         </div>
 
+        {/* Description */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">
             描述
@@ -147,34 +181,49 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
           />
         </div>
 
+        {/* Cover Image */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">
-            封面图 URL
+            封面图
           </label>
           <div className="flex gap-3 items-start">
             <div className="flex-1 space-y-2">
-              <input
-                type="text"
-                value={coverImage}
-                onChange={(e) => {
-                  setCoverImage(e.target.value);
-                  setCoverPreview(e.target.value);
-                }}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
-                  focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
-                placeholder="输入封面图片 URL（留空则自动使用随机图片）"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const randomUrl = `https://picsum.photos/seed/${Date.now()}/800/600`;
-                  setCoverImage(randomUrl);
-                  setCoverPreview(randomUrl);
-                }}
-                className="text-xs text-accent hover:text-accent/80 transition-colors"
-              >
-                🎲 随机抓取封面
-              </button>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={coverImage}
+                  onChange={(e) => {
+                    setCoverImage(e.target.value);
+                    setCoverPreview(e.target.value);
+                  }}
+                  className="flex-1 px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
+                    focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+                  placeholder="输入封面图片 URL 或上传图片"
+                />
+                <button
+                  type="button"
+                  onClick={handleCoverUpload}
+                  disabled={uploading}
+                  className="shrink-0 px-4 py-2.5 rounded-lg border border-border text-sm font-medium
+                    text-muted hover:text-foreground hover:border-accent/30 transition-colors
+                    disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploading ? "上传中..." : "上传图片"}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const randomUrl = `https://picsum.photos/seed/${Date.now()}/800/600`;
+                    setCoverImage(randomUrl);
+                    setCoverPreview(randomUrl);
+                  }}
+                  className="text-xs text-accent hover:text-accent/80 transition-colors"
+                >
+                  随机生成封面
+                </button>
+              </div>
             </div>
             {coverPreview && (
               <div className="w-20 h-15 rounded-lg overflow-hidden border border-border shrink-0 bg-muted/10">
@@ -189,43 +238,24 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
           </div>
         </div>
 
+        {/* Rich Text Editor */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="block text-sm font-medium text-foreground">
-              文章内容 (Markdown) <span className="text-red-400">*</span>
+              文章内容 <span className="text-red-400">*</span>
             </label>
-            <button
-              type="button"
-              onClick={() => setShowPreview(!showPreview)}
-              className={`text-xs px-2.5 py-1 rounded border transition-colors ${
-                showPreview
-                  ? "bg-accent text-white border-accent"
-                  : "text-muted border-border hover:border-accent/30"
-              }`}
-            >
-              {showPreview ? "编辑" : "预览"}
-            </button>
+            <span className="text-[11px] text-muted/50">
+              支持粘贴 Word 内容，自动保留格式
+            </span>
           </div>
-
-          {showPreview ? (
-            <div
-              className="w-full min-h-[400px] rounded-lg border border-border p-4 bg-background prose prose-neutral dark:prose-invert max-w-none text-sm
-                prose-headings:font-semibold prose-code:bg-muted/30 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
-                prose-pre:bg-[#1a1a2e] prose-pre:border prose-pre:border-white/5 prose-pre:rounded-lg"
-              dangerouslySetInnerHTML={{ __html: preview || "<p style='color: var(--muted)'>暂无内容</p>" }}
-            />
-          ) : (
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={20}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm font-mono
-                focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow resize-y"
-              placeholder="在此编写 Markdown 内容..."
-            />
-          )}
+          <RichEditor
+            content={content}
+            onChange={setContent}
+            placeholder="开始写作..."
+          />
         </div>
 
+        {/* Actions */}
         <div className="flex items-center gap-4 pt-2">
           <button
             type="button"
@@ -246,78 +276,17 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
           </button>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      <PostPreview
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title={title}
+        description={description}
+        contentHtml={content}
+        coverImage={coverImage}
+        date={date}
+      />
     </div>
   );
-}
-
-function renderMarkdown(text: string): string {
-  const lines = text.split("\n");
-  const html: string[] = [];
-  let inCodeBlock = false;
-  let codeLang = "";
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.startsWith("```")) {
-      if (inCodeBlock) {
-        html.push("</code></pre>");
-        inCodeBlock = false;
-        codeLang = "";
-      } else {
-        codeLang = line.slice(3).trim();
-        html.push(
-          `<pre><code${codeLang ? ` class="language-${codeLang}"` : ""}>`
-        );
-        inCodeBlock = true;
-      }
-      continue;
-    }
-
-    if (inCodeBlock) {
-      html.push(escapeHtml(line) + "\n");
-      continue;
-    }
-
-    if (line.trim() === "") {
-      html.push("</p><p>");
-      continue;
-    }
-
-    if (line.startsWith("### ")) {
-      html.push(`<h3>${parseInline(line.slice(4))}</h3>`);
-      continue;
-    }
-    if (line.startsWith("## ")) {
-      html.push(`<h2>${parseInline(line.slice(3))}</h2>`);
-      continue;
-    }
-    if (line.startsWith("# ")) {
-      html.push(`<h1>${parseInline(line.slice(2))}</h1>`);
-      continue;
-    }
-
-    html.push(parseInline(line));
-  }
-
-  return `<p>${html.join("")}</p>`;
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function parseInline(text: string): string {
-  let result = escapeHtml(text);
-  result = result.replace(/`([^`]+)`/g, "<code>$1</code>");
-  result = result.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  result = result.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-  result = result.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2">$1</a>'
-  );
-  return result;
 }
