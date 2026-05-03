@@ -2,8 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import RichEditor from "@/components/admin/RichEditor";
+import dynamic from "next/dynamic";
 import PostPreview from "@/components/admin/PostPreview";
+
+const RichEditor = dynamic(() => import("@/components/admin/RichEditor"), {
+  ssr: false,
+  loading: () => (
+    <div className="border border-border rounded-xl bg-background overflow-hidden min-h-[200px] flex items-center justify-center">
+      <span className="text-sm text-muted/50">加载编辑器中...</span>
+    </div>
+  ),
+});
 
 interface PostEditorProps {
   mode: "create" | "edit";
@@ -160,6 +169,7 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              title="日期"
               className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
                 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
             />

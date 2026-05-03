@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useEditor, EditorContent, Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import ImageExtension from "@tiptap/extension-image";
@@ -23,7 +23,14 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
   // Convert legacy markdown to HTML for TipTap
   const initialHtml = isHtmlContent(content) ? content : mdToHtml(content);
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
@@ -106,7 +113,13 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
     setShowImageInput(false);
   }, [editor, imageUrl]);
 
-  if (!editor) return null;
+  if (!mounted || !editor) {
+    return (
+      <div className="border border-border rounded-xl bg-background overflow-hidden min-h-[200px] flex items-center justify-center">
+        <span className="text-sm text-muted/50">加载编辑器中...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="border border-border rounded-xl bg-background overflow-hidden">
