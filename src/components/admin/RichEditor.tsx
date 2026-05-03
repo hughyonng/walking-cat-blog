@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
-import { useEditor, EditorContent, Editor } from "@tiptap/react";
+import { useCallback, useState, useEffect, useMemo } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import ImageExtension from "@tiptap/extension-image";
 import LinkExtension from "@tiptap/extension-link";
@@ -29,24 +29,26 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
     setMounted(true);
   }, []);
 
+  const extensions = useMemo(() => [
+    StarterKit.configure({
+      heading: { levels: [1, 2, 3] },
+    }),
+    ImageExtension.configure({
+      inline: true,
+      allowBase64: false,
+    }),
+    LinkExtension.configure({
+      openOnClick: false,
+      HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" },
+    }),
+    Placeholder.configure({
+      placeholder: placeholder || "开始写作...",
+    }),
+  ], [placeholder]);
+
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-      }),
-      ImageExtension.configure({
-        inline: false,
-        allowBase64: false,
-      }),
-      LinkExtension.configure({
-        openOnClick: false,
-        HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" },
-      }),
-      Placeholder.configure({
-        placeholder: placeholder || "开始写作...",
-      }),
-    ],
+    extensions,
     content: initialHtml,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -65,7 +67,7 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
           " prose-blockquote:border-l-accent prose-blockquote:text-muted prose-blockquote:not-italic" +
           " prose-strong:font-semibold" +
           " prose-ul:space-y-1 prose-li:leading-relaxed" +
-          " prose-img:rounded-xl prose-img:shadow-md prose-img:ring-1 prose-img:ring-black/5 prose-img:my-6" +
+          " prose-img:rounded-xl prose-img:shadow-lg prose-img:ring-1 prose-img:ring-black/5 prose-img:my-6" +
           " [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit" +
           " [&_p.is-editor-empty:first-child]:before:text-muted/40 [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)] [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0",
       },
@@ -100,18 +102,15 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
           throw new Error("图片地址格式异常: " + uploadedUrl.slice(0, 40));
         }
         console.log("Image upload response data:", JSON.stringify(data));
-        console.log("Image uploaded URL:", uploadedUrl);
+        console.log("Final Image URL:", uploadedUrl);
 
-        // Insert image into editor — try setImage first, fall back to insertContent
-        const inserted = editor.chain().focus().setImage({ src: uploadedUrl }).run();
-        if (!inserted) {
-          console.warn("setImage returned false, trying insertContent fallback");
-          editor
-            .chain()
-            .focus()
-            .insertContent(`<img src="${uploadedUrl}" alt="uploaded image" style="max-width:100%" />`)
-            .run();
-        }
+        // Insert into editor via insertContent (more reliable than setImage)
+        const imgHtml = `<img src="${uploadedUrl}" alt="uploaded image" style="max-width:100%;height:auto;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin:1.5rem 0;" />`;
+        editor
+          .chain()
+          .focus()
+          .insertContent(imgHtml)
+          .run();
       } catch (err) {
         console.error("Image upload failed:", err);
         alert("图片上传失败: " + (err instanceof Error ? err.message : "未知错误"));
