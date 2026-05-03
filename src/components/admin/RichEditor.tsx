@@ -99,8 +99,19 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
         if (!uploadedUrl.startsWith("https://")) {
           throw new Error("图片地址格式异常: " + uploadedUrl.slice(0, 40));
         }
-        console.log("Image uploaded:", uploadedUrl);
-        editor.chain().focus().setImage({ src: uploadedUrl }).run();
+        console.log("Image upload response data:", JSON.stringify(data));
+        console.log("Image uploaded URL:", uploadedUrl);
+
+        // Insert image into editor — try setImage first, fall back to insertContent
+        const inserted = editor.chain().focus().setImage({ src: uploadedUrl }).run();
+        if (!inserted) {
+          console.warn("setImage returned false, trying insertContent fallback");
+          editor
+            .chain()
+            .focus()
+            .insertContent(`<img src="${uploadedUrl}" alt="uploaded image" style="max-width:100%" />`)
+            .run();
+        }
       } catch (err) {
         console.error("Image upload failed:", err);
         alert("图片上传失败: " + (err instanceof Error ? err.message : "未知错误"));

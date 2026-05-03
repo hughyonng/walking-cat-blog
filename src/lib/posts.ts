@@ -95,13 +95,21 @@ export async function getAllPosts(): Promise<PostMeta[]> {
 }
 
 export function sanitizeSlug(text: string): string {
-  return text
+  // Short hash as fallback for pure-non-ASCII titles
+  const hash = Math.abs(
+    text.split("").reduce((h, c) => ((h << 5) - h) + c.charCodeAt(0), 0)
+  ).toString(36).slice(0, 8);
+
+  const slug = text
     .toLowerCase()
-    .replace(/[^\w\s一-鿿-]/g, "")
+    // Strip Chinese and other non-ASCII, keep a-z, 0-9, spaces, hyphens
+    .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
-    || "untitled";
+    .trim();
+
+  return slug || `post-${hash}`;
 }
 
 function resolvePostPath(slug: string): string {

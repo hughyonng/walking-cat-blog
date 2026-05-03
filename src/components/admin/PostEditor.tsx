@@ -40,6 +40,7 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
   const [coverImage, setCoverImage] = useState(initialData?.coverImage || "");
   const [content, setContent] = useState(initialData?.content || "");
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
   const [coverPreview, setCoverPreview] = useState(initialData?.coverImage || "");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -110,12 +111,17 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
         throw new Error(data.error || "保存失败");
       }
 
+      // Show "云端同步中" for 2s before redirecting
+      setSaving(false);
+      setSyncing(true);
+      await new Promise((r) => setTimeout(r, 2000));
+
       router.push("/admin/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败");
-    } finally {
       setSaving(false);
+      setSyncing(false);
     }
   };
 
@@ -271,11 +277,24 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || syncing}
             className="px-5 py-2.5 rounded-lg bg-accent text-white text-sm font-medium
-              hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {saving ? "保存中..." : isEdit ? "更新文章" : "发布文章"}
+            {syncing ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+                </svg>
+                云端同步中...
+              </>
+            ) : saving ? (
+              "保存中..."
+            ) : isEdit ? (
+              "更新文章"
+            ) : (
+              "发布文章"
+            )}
           </button>
           <button
             type="button"
