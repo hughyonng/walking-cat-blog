@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { isGitHubMode, getFile, putFile } from "@/lib/github";
 
 export interface SiteConfig {
   siteTitle: string;
@@ -9,6 +10,7 @@ export interface SiteConfig {
 }
 
 const configPath = path.join(process.cwd(), "src", "data", "site-config.json");
+const REPO_CONFIG_PATH = "src/data/site-config.json";
 
 const defaultConfig: SiteConfig = {
   siteTitle: "行走的猫",
@@ -39,12 +41,21 @@ export function getSiteConfig(): SiteConfig {
   return config;
 }
 
-export function updateSiteConfig(data: Partial<SiteConfig>): SiteConfig {
+export async function updateSiteConfig(data: Partial<SiteConfig>): Promise<SiteConfig> {
   const current = getSiteConfig();
   const updated = { ...current, ...data };
 
-  // Don't write admin credentials to file when env vars are active (Vercel)
-  if (!process.env.ADMIN_EMAIL && !process.env.ADMIN_PASSWORD) {
+  if (isGitHubMode) {
+    const existing = await getFile(REPO_CONFIG_PATH);
+    const sha = existing?.sha;
+    await putFile(
+      REPO_CONFIG_PATH,
+      JSON.stringify(updated, null, 2),
+      "Update site configuration",
+      sha
+    );
+  } else if (!process.env.ADMIN_EMAIL && !process.env.ADMIN_PASSWORD) {
+    // Local dev: write to file directly (skip when env vars override credentials)
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(updated, null, 2), "utf8");
   }

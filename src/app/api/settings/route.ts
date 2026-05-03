@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest) {
     if (adminEmail?.trim()) updates.adminEmail = adminEmail.trim();
     if (newPassword) updates.adminPassword = newPassword;
 
-    const updated = updateSiteConfig(updates);
+    const updated = await updateSiteConfig(updates);
 
     // Never expose password
     const { adminPassword: _, ...safe } = updated;
