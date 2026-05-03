@@ -4,11 +4,22 @@ import { getTokenFromRequest, verifyToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const BLOB_TOKEN =
+  process.env.walking1544544hfhgfjgj_READ_WRITE_TOKEN ||
+  process.env.BLOB_READ_WRITE_TOKEN;
+
 export async function POST(request: NextRequest) {
   // Verify authentication
   const token = await getTokenFromRequest(request);
   if (!token || !(await verifyToken(token))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!BLOB_TOKEN) {
+    return NextResponse.json(
+      { error: "Vercel Blob token not configured" },
+      { status: 500 }
+    );
   }
 
   try {
@@ -32,6 +43,7 @@ export async function POST(request: NextRequest) {
     const blob = await put(file.name, file, {
       access: "public",
       addRandomSuffix: true,
+      token: BLOB_TOKEN,
     });
 
     return NextResponse.json({ url: blob.url });
