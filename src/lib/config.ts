@@ -54,8 +54,8 @@ export async function updateSiteConfig(data: Partial<SiteConfig>): Promise<SiteC
       "Update site configuration",
       sha
     );
-  } else if (!process.env.ADMIN_EMAIL && !process.env.ADMIN_PASSWORD) {
-    // Local dev: write to file directly (skip when env vars override credentials)
+  } else {
+    // Local dev: write to file directly
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(updated, null, 2), "utf8");
   }
