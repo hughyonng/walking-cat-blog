@@ -58,7 +58,7 @@ export default async function DashboardPage() {
                   <td className="px-4 py-3.5">
                     <div>
                       <Link
-                        href={`/admin/dashboard/edit/${post.slug}`}
+                        href={`/admin/dashboard/edit/${encodeURIComponent(post.slug)}`}
                         className="text-foreground hover:text-accent transition-colors font-medium"
                       >
                         {post.title}
@@ -74,7 +74,7 @@ export default async function DashboardPage() {
                   <td className="px-4 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <Link
-                        href={`/admin/dashboard/edit/${post.slug}`}
+                        href={`/admin/dashboard/edit/${encodeURIComponent(post.slug)}`}
                         className="text-xs text-muted hover:text-accent transition-colors"
                       >
                         编辑

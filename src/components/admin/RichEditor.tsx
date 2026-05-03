@@ -65,7 +65,7 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
           " prose-blockquote:border-l-accent prose-blockquote:text-muted prose-blockquote:not-italic" +
           " prose-strong:font-semibold" +
           " prose-ul:space-y-1 prose-li:leading-relaxed" +
-          " prose-img:rounded-lg prose-img:my-4" +
+          " prose-img:rounded-xl prose-img:shadow-md prose-img:ring-1 prose-img:ring-black/5 prose-img:my-6" +
           " [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit" +
           " [&_p.is-editor-empty:first-child]:before:text-muted/40 [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)] [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0",
       },
@@ -91,7 +91,16 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Upload failed");
-        editor.chain().focus().setImage({ src: data.url }).run();
+        // Validate the returned URL
+        const uploadedUrl = data.url;
+        if (!uploadedUrl || typeof uploadedUrl !== "string") {
+          throw new Error("服务器未返回有效的图片地址");
+        }
+        if (!uploadedUrl.startsWith("https://")) {
+          throw new Error("图片地址格式异常: " + uploadedUrl.slice(0, 40));
+        }
+        console.log("Image uploaded:", uploadedUrl);
+        editor.chain().focus().setImage({ src: uploadedUrl }).run();
       } catch (err) {
         console.error("Image upload failed:", err);
         alert("图片上传失败: " + (err instanceof Error ? err.message : "未知错误"));
