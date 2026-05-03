@@ -89,11 +89,12 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
           method: "POST",
           body: formData,
         });
-        if (!res.ok) throw new Error("Upload failed");
-        const { url } = await res.json();
-        editor.chain().focus().setImage({ src: url }).run();
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Upload failed");
+        editor.chain().focus().setImage({ src: data.url }).run();
       } catch (err) {
         console.error("Image upload failed:", err);
+        alert("图片上传失败: " + (err instanceof Error ? err.message : "未知错误"));
       }
     };
     input.click();

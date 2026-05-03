@@ -63,12 +63,13 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
           method: "POST",
           body: formData,
         });
-        if (!res.ok) throw new Error("上传失败");
-        const { url } = await res.json();
-        setCoverImage(url);
-        setCoverPreview(url);
-      } catch {
-        setError("图片上传失败，请重试");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "上传失败");
+        setCoverImage(data.url);
+        setCoverPreview(data.url);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "上传失败";
+        setError(`封面图上传失败: ${msg}`);
       } finally {
         setUploading(false);
       }
