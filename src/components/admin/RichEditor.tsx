@@ -32,6 +32,7 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
   const extensions = useMemo(() => [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
+      link: false,
     }),
     ImageExtension.configure({
       inline: true,
