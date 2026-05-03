@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getTokenFromRequest, verifyToken } from "@/lib/auth";
+import { getSiteConfig, updateSiteConfig } from "@/lib/config";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const config = getSiteConfig();
+  // Never expose password to client
+  const { adminPassword, ...safe } = config;
+  return NextResponse.json(safe);
+}
+
+export async function PUT(request: NextRequest) {
+  const token = await getTokenFromRequest(request);
+
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const payload = await verifyToken(token);
+
+  if (!payload) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { siteTitle, siteSubtitle, adminEmail, currentPassword, newPassword } = body;
+
+    const currentConfig = getSiteConfig();
+
+    // If changing password, verify current password
+    if (newPassword) {
+      if (!currentPassword) {
+        return NextResponse.json({ error: "请输入当前密码" }, { status: 400 });
+      }
+      if (currentPassword !== currentConfig.adminPassword) {
+        return NextResponse.json({ error: "当前密码错误" }, { status: 403 });
+      }
+      if (newPassword.length < 3) {
+        return NextResponse.json({ error: "新密码至少 3 个字符" }, { status: 400 });
+      }
+    }
+
+    const updates: Record<string, string> = {};
+
+    if (siteTitle?.trim()) updates.siteTitle = siteTitle.trim();
+    if (siteSubtitle !== undefined) updates.siteSubtitle = siteSubtitle.trim();
+    if (adminEmail?.trim()) updates.adminEmail = adminEmail.trim();
+    if (newPassword) updates.adminPassword = newPassword;
+
+    const updated = updateSiteConfig(updates);
+
+    // Never expose password
+    const { adminPassword: _, ...safe } = updated;
+    return NextResponse.json(safe);
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+}

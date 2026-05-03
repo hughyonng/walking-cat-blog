@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(taskkill /PID 4176 /F)",
+      "Bash(npx kill-port *)",
+      "Bash(cmd.exe /c \"taskkill /F /PID 4176 2>nul & taskkill /F /IM node.exe 2>nul\")",
+      "Bash(curl -s http://localhost:3000)",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__emulate",
+      "Bash(curl -s http://localhost:3000/posts/web-development-trends-2026)",
+      "Bash(curl -s http://localhost:3000/about)"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(create-next-app . --use-npm --typescript --tailwind --eslint --app --src-dir)",
+      "Bash(npm --version)",
+      "Bash(npx create-next-app@latest . --use-npm --typescript --tailwind --eslint --app --src-dir)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(xargs grep *)"
+    ]
+  }
+}
