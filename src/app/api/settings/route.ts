@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getTokenFromRequest, verifyToken } from "@/lib/auth";
 import { getSiteConfig, updateSiteConfig } from "@/lib/config";
 
@@ -51,6 +52,10 @@ export async function PUT(request: NextRequest) {
     if (newPassword) updates.adminPassword = newPassword;
 
     const updated = await updateSiteConfig(updates);
+
+    // Bust cache for public pages
+    revalidatePath("/", "layout");
+    revalidatePath("/about", "page");
 
     // Never expose password
     const { adminPassword: _, ...safe } = updated;
