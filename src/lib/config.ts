@@ -7,6 +7,15 @@ export interface SiteConfig {
   siteSubtitle: string;
   adminEmail: string;
   adminPassword: string;
+  about: {
+    introduction: string;
+    github: string;
+    zhihu: string;
+    email: string;
+    x: string;
+    skills: string[];
+    avatar: string;
+  };
 }
 
 const configPath = path.join(process.cwd(), "src", "data", "site-config.json");
@@ -17,6 +26,15 @@ const defaultConfig: SiteConfig = {
   siteSubtitle: "一个数字游民关于技术、现代与人文的思考",
   adminEmail: "hughyonng@gmail.com",
   adminPassword: "121@sd4545",
+  about: {
+    introduction: "",
+    github: "",
+    zhihu: "",
+    email: "",
+    x: "",
+    skills: [],
+    avatar: "",
+  },
 };
 
 let cachedConfig: SiteConfig | null = null;
@@ -29,14 +47,23 @@ export async function getSiteConfig(): Promise<SiteConfig> {
   if (isGitHubMode) {
     const file = await getContentFile(REPO_CONFIG_PATH);
     if (file) {
-      config = { ...defaultConfig, ...JSON.parse(file.content) };
+      const raw = JSON.parse(file.content);
+      config = {
+        ...defaultConfig,
+        ...raw,
+        about: { ...defaultConfig.about, ...(raw.about || {}) },
+      };
     } else {
       config = { ...defaultConfig };
     }
   } else {
     try {
-      const raw = fs.readFileSync(configPath, "utf8");
-      config = { ...defaultConfig, ...JSON.parse(raw) };
+      const raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      config = {
+        ...defaultConfig,
+        ...raw,
+        about: { ...defaultConfig.about, ...(raw.about || {}) },
+      };
     } catch {
       config = { ...defaultConfig };
     }
@@ -52,7 +79,11 @@ export async function getSiteConfig(): Promise<SiteConfig> {
 
 export async function updateSiteConfig(data: Partial<SiteConfig>): Promise<SiteConfig> {
   const current = await getSiteConfig();
-  const updated = { ...current, ...data };
+  const updated = {
+    ...current,
+    ...data,
+    about: data.about ? { ...current.about, ...data.about } : current.about,
+  };
 
   if (isGitHubMode) {
     const existing = await getContentFile(REPO_CONFIG_PATH);

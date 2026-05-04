@@ -2,11 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import SkillTagInput from "./SkillTagInput";
 
 interface SiteConfig {
   siteTitle: string;
   siteSubtitle: string;
   adminEmail: string;
+  about: {
+    introduction: string;
+    github: string;
+    zhihu: string;
+    email: string;
+    x: string;
+    skills: string[];
+    avatar: string;
+  };
 }
 
 export default function SettingsForm() {
@@ -139,6 +149,64 @@ export default function SettingsForm() {
     } finally {
       setChangingPassword(false);
     }
+  };
+
+  const updateAbout = (partial: Partial<SiteConfig["about"]>) => {
+    setConfig((prev) => {
+      if (!prev) return prev;
+      return { ...prev, about: { ...prev.about, ...partial } };
+    });
+  };
+
+  const handleSaveAbout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!config) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ about: config.about }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "保存失败");
+      }
+      setMessage({ type: "success", text: "关于我已保存" });
+      router.refresh();
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "保存失败",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAvatarUpload = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "上传失败");
+        updateAbout({ avatar: data.url });
+      } catch (err) {
+        setMessage({
+          type: "error",
+          text: `头像上传失败: ${err instanceof Error ? err.message : "未知错误"}`,
+        });
+      }
+    };
+    input.click();
   };
 
   if (!config) {
@@ -306,6 +374,149 @@ export default function SettingsForm() {
                 hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {changingPassword ? "修改中..." : "修改密码"}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* About Section */}
+      <section>
+        <h2 className="text-base font-semibold text-foreground mb-4 pb-3 border-b border-border/60">
+          关于我
+        </h2>
+        <form onSubmit={handleSaveAbout} className="space-y-5">
+          <div>
+            <label htmlFor="introduction" className="block text-sm font-medium text-foreground mb-1.5">
+              个人介绍
+            </label>
+            <textarea
+              id="introduction"
+              rows={4}
+              value={config.about.introduction}
+              onChange={(e) => updateAbout({ introduction: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
+                focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow resize-y"
+              placeholder="写一段个人简介，支持多行文本"
+            />
+            <p className="mt-1.5 text-xs text-muted">支持多行文本，每段之间用空行分隔</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="aboutGithub" className="block text-sm font-medium text-foreground mb-1.5">
+                GitHub 链接
+              </label>
+              <input
+                id="aboutGithub"
+                type="text"
+                value={config.about.github}
+                onChange={(e) => updateAbout({ github: e.target.value })}
+                placeholder="https://github.com/username"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
+                  focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+              />
+            </div>
+            <div>
+              <label htmlFor="aboutZhihu" className="block text-sm font-medium text-foreground mb-1.5">
+                知乎链接
+              </label>
+              <input
+                id="aboutZhihu"
+                type="text"
+                value={config.about.zhihu}
+                onChange={(e) => updateAbout({ zhihu: e.target.value })}
+                placeholder="https://zhihu.com/people/username"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
+                  focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+              />
+            </div>
+            <div>
+              <label htmlFor="aboutX" className="block text-sm font-medium text-foreground mb-1.5">
+                X (Twitter) 链接
+              </label>
+              <input
+                id="aboutX"
+                type="text"
+                value={config.about.x}
+                onChange={(e) => updateAbout({ x: e.target.value })}
+                placeholder="https://x.com/username"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
+                  focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+              />
+            </div>
+            <div>
+              <label htmlFor="aboutEmail" className="block text-sm font-medium text-foreground mb-1.5">
+                公开联系邮箱
+              </label>
+              <input
+                id="aboutEmail"
+                type="email"
+                value={config.about.email}
+                onChange={(e) => updateAbout({ email: e.target.value })}
+                placeholder="your@email.com"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
+                  focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+              />
+              <p className="mt-1.5 text-xs text-muted">此邮箱将公开显示在关于页面</p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              头像
+            </label>
+            <div className="flex gap-3 items-center">
+              <input
+                type="text"
+                value={config.about.avatar}
+                onChange={(e) => updateAbout({ avatar: e.target.value })}
+                placeholder="头像 URL 或上传图片"
+                className="flex-1 w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
+                  focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+              />
+              <button
+                type="button"
+                onClick={handleAvatarUpload}
+                className="shrink-0 px-4 py-2.5 rounded-lg border border-border text-sm font-medium
+                  text-muted hover:text-foreground hover:border-accent/30 transition-colors"
+              >
+                上传头像
+              </button>
+            </div>
+            {config.about.avatar && (
+              <div className="mt-3 flex items-center gap-3">
+                <img
+                  src={config.about.avatar}
+                  alt="头像预览"
+                  className="w-16 h-16 rounded-full object-cover border border-border"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+                <span className="text-xs text-muted">预览</span>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              技能标签
+            </label>
+            <SkillTagInput
+              tags={config.about.skills}
+              onChange={(skills) => updateAbout({ skills })}
+            />
+            <p className="mt-1.5 text-xs text-muted">输入技能名称后按 Enter 添加，点击 × 删除</p>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-5 py-2 rounded-lg bg-accent text-white text-sm font-medium
+                hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {saving ? "保存中..." : "保存关于我"}
             </button>
           </div>
         </form>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getTokenFromRequest, verifyToken } from "@/lib/auth";
-import { getSiteConfig, updateSiteConfig } from "@/lib/config";
+import { getSiteConfig, updateSiteConfig, type SiteConfig } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { siteTitle, siteSubtitle, adminEmail, currentPassword, newPassword } = body;
+    const { siteTitle, siteSubtitle, adminEmail, currentPassword, newPassword, about } = body;
 
     const currentConfig = await getSiteConfig();
 
@@ -44,12 +44,13 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const updates: Record<string, string> = {};
+    const updates: Partial<SiteConfig> = {};
 
     if (siteTitle?.trim()) updates.siteTitle = siteTitle.trim();
     if (siteSubtitle !== undefined) updates.siteSubtitle = siteSubtitle.trim();
     if (adminEmail?.trim()) updates.adminEmail = adminEmail.trim();
     if (newPassword) updates.adminPassword = newPassword;
+    if (about && typeof about === "object") updates.about = about;
 
     const updated = await updateSiteConfig(updates);
 
