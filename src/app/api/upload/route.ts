@@ -3,8 +3,8 @@ import { getTokenFromRequest, verifyToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-const IMG_OWNER = "hughyonng";
-const IMG_REPO = "blog-images";
+const IMG_OWNER = process.env.GITHUB_OWNER || "hughyonng";
+const IMG_REPO = process.env.IMAGE_REPO || "blog-images";
 const IMG_BRANCH = "main";
 const IMG_PATH = "posts";
 
