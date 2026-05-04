@@ -138,8 +138,27 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
   const handlePublish = () => doSave("published");
   const handleSaveDraft = () => doSave("draft");
 
-  const publishLabel = isEdit ? "更新文章" : "发布文章";
-  const draftLabel = isEdit && isDraft ? "保存草稿" : "保存为草稿";
+  // ── 场景化按钮配置 ──
+  const isPublishing = saving && !syncing;
+  const scenarios = {
+    // 新建文章
+    create: {
+      primary: { label: "正式发布", action: handlePublish },
+      secondary: { label: "保存草稿", action: handleSaveDraft },
+    },
+    // 从草稿箱打开
+    draft: {
+      primary: { label: "正式发布（转正）", action: handlePublish },
+      secondary: { label: "更新草稿", action: handleSaveDraft },
+    },
+    // 已发布文章
+    published: {
+      primary: { label: "更新文章", action: handlePublish },
+      secondary: { label: "转为草稿（下线）", action: handleSaveDraft },
+    },
+  } as const;
+
+  const current = !isEdit ? scenarios.create : isDraft ? scenarios.draft : scenarios.published;
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -295,12 +314,15 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
 
         {/* Actions */}
         <div className="flex items-center gap-4 pt-2">
+          {/* 主按钮 — 正式发布 / 更新文章 / 转正 */}
           <button
             type="button"
-            onClick={handlePublish}
+            onClick={current.primary.action}
             disabled={saving || syncing}
-            className="px-5 py-2.5 rounded-lg bg-accent text-white text-sm font-medium
-              hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-5 py-2.5 rounded-lg text-white text-sm font-medium
+              bg-emerald-600 hover:bg-emerald-500
+              dark:bg-emerald-500 dark:hover:bg-emerald-400
+              transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
           >
             {syncing ? (
               <>
@@ -309,21 +331,27 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
                 </svg>
                 云端同步中...
               </>
-            ) : saving ? (
+            ) : isPublishing ? (
               "保存中..."
             ) : (
-              publishLabel
+              current.primary.label
             )}
           </button>
+
+          {/* 次按钮 — 保存草稿 / 更新草稿 / 下线 */}
           <button
             type="button"
-            onClick={handleSaveDraft}
+            onClick={current.secondary.action}
             disabled={saving || syncing}
-            className="px-5 py-2.5 rounded-lg border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 text-sm font-medium
-              hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 rounded-lg border text-sm font-medium
+              border-stone-300 dark:border-stone-600
+              text-stone-600 dark:text-stone-400
+              hover:bg-stone-100 dark:hover:bg-stone-800/40
+              transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {draftLabel}
+            {current.secondary.label}
           </button>
+
           <button
             type="button"
             onClick={() => router.push("/admin/dashboard")}
