@@ -312,18 +312,26 @@ export async function updatePost(
 
     if (newSlug !== slug || targetType !== source) {
       // Slug changed or status changed — move the file
+      // 1. Check if target already exists and get its SHA (upsert)
       const existingTarget = await getContentFile(writePath);
+      const targetSha = existingTarget?.sha;
+
+      // If target slug is different and already exists → conflict
       if (existingTarget && newSlug !== slug) {
         throw new Error(`A post with slug "${newSlug}" already exists`);
       }
 
-      const oldFile = await getContentFile(repoFilePath(source, slug));
-      if (!oldFile) throw new Error(`Post "${slug}" not found`);
-
+      // 2. Write to target first (create or overwrite, with SHA if updating)
       await putContentFile(writePath, fileContent,
-        `Move post: ${slug} → ${newSlug} (${source} → ${targetType})`);
-      await deleteContentFile(repoFilePath(source, slug), oldFile.sha,
-        `Delete old: ${slug} from ${source}`);
+        `Move post: ${slug} → ${newSlug} (${source} → ${targetType})`,
+        targetSha);
+
+      // 3. Delete source file after successful write
+      const oldFile = await getContentFile(repoFilePath(source, slug));
+      if (oldFile) {
+        await deleteContentFile(repoFilePath(source, slug), oldFile.sha,
+          `Delete old: ${slug} from ${source}`);
+      }
     } else {
       await putContentFile(writePath, fileContent, `Update post: ${newTitle}`, existingSha);
     }
