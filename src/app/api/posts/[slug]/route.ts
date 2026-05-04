@@ -31,14 +31,15 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const result = updatePost(slug, {
+    console.log("Starting update...", { slug });
+    const result = await updatePost(slug, {
       title: body.title,
       date: body.date,
       description: body.description,
       content: body.content,
       coverImage: body.coverImage,
     });
-    return NextResponse.json(result);
+    console.log("Update success!", result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update post";
     const status = message.includes("not found") ? 404 : message.includes("already exists") ? 409 : 500;
@@ -58,8 +59,9 @@ export async function DELETE(
   const { slug } = await params;
 
   try {
-    deletePost(slug);
-    return NextResponse.json({ success: true });
+    console.log("Starting delete...", { slug });
+    await deletePost(slug);
+    console.log("Delete success!", { slug });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to delete post";
     const status = message.includes("not found") ? 404 : 500;

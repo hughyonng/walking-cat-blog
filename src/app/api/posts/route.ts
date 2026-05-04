@@ -34,13 +34,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = createPost(
+    console.log("Starting upload...", { title });
+    const result = await createPost(
       title,
       date || new Date().toISOString().split("T")[0],
       description || "",
       content,
       coverImage
     );
+    console.log("Upload success!", result);
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

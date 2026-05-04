@@ -148,7 +148,9 @@ export async function createPost(
   if (isGitHubMode) {
     const existing = await getContentFile(repoPath);
     if (existing) throw new Error(`A post with slug "${slug}" already exists`);
+    console.log("Writing post to blog-images:", { path: repoPath, title });
     await putContentFile(repoPath, fileContent, `Create post: ${title}`);
+    console.log("Post written successfully");
     return { slug };
   }
 
@@ -193,6 +195,8 @@ export async function updatePost(
     const repoPath = repoPostPath(slug);
     const newRepoPath = repoPostPath(newSlug);
 
+    console.log("Updating post in blog-images:", { from: slug, to: newSlug });
+
     if (newSlug !== slug) {
       const newExisting = await getContentFile(newRepoPath);
       if (newExisting) throw new Error(`A post with slug "${newSlug}" already exists`);
@@ -206,6 +210,7 @@ export async function updatePost(
       await putContentFile(repoPath, fileContent, `Update post: ${newTitle}`, existingSha);
     }
 
+    console.log("Post update successful");
     return { slug: newSlug };
   }
 
@@ -228,9 +233,11 @@ export async function updatePost(
 export async function deletePost(slug: string): Promise<void> {
   if (isGitHubMode) {
     const repoPath = repoPostPath(slug);
+    console.log("Deleting post from blog-images:", { path: repoPath });
     const file = await getContentFile(repoPath);
     if (!file) throw new Error(`Post "${slug}" not found`);
     await deleteContentFile(repoPath, file.sha, `Delete post: ${slug}`);
+    console.log("Post deleted successfully");
     return;
   }
 
