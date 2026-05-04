@@ -45,6 +45,7 @@ export async function PUT(
       description: body.description,
       content: body.content,
       coverImage: body.coverImage,
+      order: body.order ? Number(body.order) : undefined,
       status: body.status,
     }, source);
     console.log("Update success!", result);

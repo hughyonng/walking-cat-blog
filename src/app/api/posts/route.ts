@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, date, description, content, coverImage, status } = body;
+    const { title, date, description, content, coverImage, order, status } = body;
 
     if (!title || !content) {
       return NextResponse.json(
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       description || "",
       content,
       coverImage,
+      order ? Number(order) : undefined,
       status
     );
     console.log("Upload success!", result);

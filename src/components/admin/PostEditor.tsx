@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import PostPreview from "@/components/admin/PostPreview";
@@ -23,8 +23,31 @@ interface PostEditorProps {
     description: string;
     content: string;
     coverImage?: string;
+    order?: number;
   };
   source?: "draft" | "published";
+}
+
+/** 从标题中智能识别序号（一、二、三... 或 1、2、3...) */
+function detectOrderFromTitle(title: string): number | null {
+  const chineseNum: Record<string, number> = {
+    "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
+    "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+  };
+
+  // （1）或 (1) 阿拉伯数字
+  const arabic = title.match(/[（(]\s*(\d+)\s*[）)]/);
+  if (arabic) return parseInt(arabic[1], 10);
+
+  // （三）或 (三) 中文数字
+  const chineseParen = title.match(/[（(]\s*([一二三四五六七八九十])\s*[）)]/);
+  if (chineseParen) return chineseNum[chineseParen[1]] ?? null;
+
+  // 三、 或 三．格式
+  const chineseComma = title.match(/([一二三四五六七八九十])[、．.]/);
+  if (chineseComma) return chineseNum[chineseComma[1]] ?? null;
+
+  return null;
 }
 
 export default function PostEditor({ mode, initialData, source }: PostEditorProps) {
@@ -41,6 +64,7 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
   );
   const [coverImage, setCoverImage] = useState(initialData?.coverImage || "");
   const [content, setContent] = useState(initialData?.content || "");
+  const [order, setOrder] = useState(initialData?.order ?? 0);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
@@ -80,6 +104,14 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
     input.click();
   };
 
+  // ── 智能识别标题中的序号 ──
+  useEffect(() => {
+    if (!isEdit && order === 0 && title) {
+      const detected = detectOrderFromTitle(title);
+      if (detected !== null) setOrder(detected);
+    }
+  }, [title]);
+
   const buildSaveUrl = (forStatus: "draft" | "published") => {
     if (isEdit) {
       // Query param tells the API where to read the existing content from
@@ -107,7 +139,7 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
       const url = buildSaveUrl(status);
       const method = isEdit ? "PUT" : "POST";
 
-      const body: Record<string, string> = { title, date, description, content, status };
+      const body: Record<string, string | number> = { title, date, description, content, status, order };
       if (coverImage.trim()) body.coverImage = coverImage.trim();
 
       const res = await fetch(url, {
@@ -236,6 +268,28 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
               focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
             placeholder="简短的文章描述（可选）"
           />
+        </div>
+
+        {/* Order + Cover Image row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              排序权重
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={order}
+              onChange={(e) => setOrder(Math.max(0, parseInt(e.target.value) || 0))}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
+                focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+              placeholder="0"
+              title="数字越小越靠前，0 为默认值"
+            />
+            <p className="mt-1 text-[11px] text-muted/50">
+              数字越小越靠前，支持智能识别
+            </p>
+          </div>
         </div>
 
         {/* Cover Image */}

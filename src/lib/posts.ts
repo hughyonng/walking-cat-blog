@@ -12,6 +12,7 @@ export interface PostMeta {
   date: string;
   description: string;
   coverImage: string;
+  order: number;
 }
 
 export interface Post extends PostMeta {
@@ -71,10 +72,12 @@ function buildPostContent(
   date: string,
   description: string,
   content: string,
-  coverImage?: string
+  coverImage?: string,
+  order?: number
 ): string {
-  const frontmatter: Record<string, string> = { title, date, description };
+  const frontmatter: Record<string, string | number> = { title, date, description };
   if (coverImage) frontmatter.coverImage = coverImage;
+  if (order && order > 0) frontmatter.order = order;
   return matter.stringify(content, frontmatter);
 }
 
@@ -91,6 +94,7 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
       date: data.date,
       description: data.description,
       coverImage: data.coverImage || getDefaultCoverImage(slug),
+      order: data.order ? Number(data.order) : 0,
       content,
     };
   } catch {
@@ -107,6 +111,7 @@ export async function getDraftBySlug(slug: string): Promise<Post | null> {
       date: data.date,
       description: data.description,
       coverImage: data.coverImage || getDefaultCoverImage(slug),
+      order: data.order ? Number(data.order) : 0,
       content,
     };
   } catch {
@@ -127,6 +132,7 @@ export async function getAllPosts(): Promise<PostMeta[]> {
             date: data.date,
             description: data.description,
             coverImage: data.coverImage || getDefaultCoverImage(slug),
+            order: data.order ? Number(data.order) : 0,
           };
         } catch {
           return null;
@@ -135,7 +141,11 @@ export async function getAllPosts(): Promise<PostMeta[]> {
     )
   )
     .filter((p): p is PostMeta => p !== null)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .sort((a, b) => {
+      const orderDiff = (a.order || 0) - (b.order || 0);
+      if (orderDiff !== 0) return orderDiff;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
 
   return posts;
 }
@@ -153,6 +163,7 @@ export async function getAllDrafts(): Promise<PostMeta[]> {
             date: data.date,
             description: data.description,
             coverImage: data.coverImage || getDefaultCoverImage(slug),
+            order: data.order ? Number(data.order) : 0,
           };
         } catch {
           return null;
@@ -161,7 +172,11 @@ export async function getAllDrafts(): Promise<PostMeta[]> {
     )
   )
     .filter((p): p is PostMeta => p !== null)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .sort((a, b) => {
+      const orderDiff = (a.order || 0) - (b.order || 0);
+      if (orderDiff !== 0) return orderDiff;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
 
   return drafts;
 }
@@ -226,6 +241,7 @@ export async function createPost(
   description: string,
   content: string,
   coverImage?: string,
+  order?: number,
   status?: "draft" | "published"
 ): Promise<{ slug: string; isUpdate: boolean }> {
   if (!title.trim()) throw new Error("Title is required");
@@ -234,7 +250,7 @@ export async function createPost(
   const slug = generateSlug(title);
   const effectiveStatus = status || "published";
   const type = effectiveStatus === "draft" ? "drafts" : "posts";
-  const fileContent = buildPostContent(title, date, description, content, coverImage);
+  const fileContent = buildPostContent(title, date, description, content, coverImage, order);
 
   if (isGitHubMode) {
     // Retry with new random suffix if slug collides (same second + same random)
@@ -298,7 +314,7 @@ export async function createPost(
 
 export async function updatePost(
   slug: string,
-  data: { title?: string; date?: string; description?: string; content?: string; coverImage?: string; status?: "draft" | "published" },
+  data: { title?: string; date?: string; description?: string; content?: string; coverImage?: string; order?: number; status?: "draft" | "published" },
   source: "posts" | "drafts" = "posts"
 ): Promise<{ slug: string }> {
   let existing: { data: Record<string, string>; content: string };
@@ -321,6 +337,7 @@ export async function updatePost(
   const newDescription = data.description || existing.data.description;
   const newCoverImage = data.coverImage !== undefined ? data.coverImage : existing.data.coverImage;
   const newContent = data.content !== undefined ? data.content : existing.content;
+  const newOrder = data.order !== undefined ? data.order : (existing.data.order ? Number(existing.data.order) : 0);
   const newStatus = data.status || (source === "drafts" ? "draft" : "published");
   const targetType = newStatus === "draft" ? "drafts" : "posts";
 
@@ -334,7 +351,7 @@ export async function updatePost(
       ? `${existingTimestamp}-${newTitleSlug}`
       : generateSlug(newTitle);
   }
-  const fileContent = buildPostContent(newTitle, newDate, newDescription, newContent, newCoverImage);
+  const fileContent = buildPostContent(newTitle, newDate, newDescription, newContent, newCoverImage, newOrder);
 
   if (isGitHubMode) {
     const writePath = repoFilePath(targetType, newSlug);
