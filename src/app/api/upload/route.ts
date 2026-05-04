@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Octokit } from "octokit";
 import { getTokenFromRequest, verifyToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -44,44 +43,60 @@ export async function POST(request: NextRequest) {
     const date = new Date().toISOString().slice(0, 10);
     const rand = Math.random().toString(36).slice(2, 8);
     const filename = `${date}-${rand}.${ext}`;
+    const filePath = `${IMG_PATH}/${filename}`;
 
     console.log("=== Upload Debug ===");
     console.log("File name:", file.name);
     console.log("File size:", file.size);
     console.log("File type:", file.type);
-    console.log("Target Repo:", `${IMG_OWNER}/${IMG_REPO}`);
-    console.log("Upload Branch:", IMG_BRANCH);
-    console.log("Upload Path:", `${IMG_PATH}/${filename}`);
+    console.log("Attempting upload to:", IMG_OWNER, IMG_REPO, filePath);
+    console.log("Branch:", IMG_BRANCH);
+    console.log("Token length:", githubToken.length);
+    console.log("=== End Debug ===");
 
     // Read file as base64
     const buffer = Buffer.from(await file.arrayBuffer());
     const content = buffer.toString("base64");
-    console.log("Base64 length:", content.length);
-    console.log("=== End Debug ===");
 
-    const octokit = new Octokit({ auth: githubToken });
-    await octokit.rest.repos.createOrUpdateFileContents({
-      owner: IMG_OWNER,
-      repo: IMG_REPO,
-      path: `${IMG_PATH}/${filename}`,
-      message: `Upload image: ${filename}`,
-      content,
-      branch: IMG_BRANCH,
+    // Use raw fetch to GitHub API (avoids Octokit routing issues)
+    const url = `https://api.github.com/repos/${IMG_OWNER}/${IMG_REPO}/contents/${filePath}`;
+    console.log("PUT", url);
+
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        "User-Agent": "walking-cat-blog",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: `Upload image: ${filename}`,
+        content,
+        branch: IMG_BRANCH,
+      }),
     });
 
-    const url = `https://raw.githubusercontent.com/${IMG_OWNER}/${IMG_REPO}/${IMG_BRANCH}/${IMG_PATH}/${filename}`;
+    console.log("GitHub API response status:", res.status);
 
-    return NextResponse.json({ url });
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("GitHub API error body:", errBody);
+      return NextResponse.json(
+        { error: `GitHub API ${res.status}: ${errBody}` },
+        { status: 500 }
+      );
+    }
+
+    const resultUrl = `https://raw.githubusercontent.com/${IMG_OWNER}/${IMG_REPO}/${IMG_BRANCH}/${filePath}`;
+    console.log("Upload success:", resultUrl);
+
+    return NextResponse.json({ url: resultUrl });
   } catch (error) {
     console.error("=== Upload Error ===");
     console.error("Error:", error);
-    if (error instanceof Error && "response" in error) {
-      const ghErr = error as { response?: { status?: number; data?: unknown } };
-      console.error("GitHub API Status:", ghErr.response?.status);
-      console.error("GitHub API Response:", JSON.stringify(ghErr.response?.data, null, 2));
-    } else if (error instanceof Error) {
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
+    if (error instanceof Error) {
+      console.error("Message:", error.message);
+      console.error("Stack:", error.stack);
     }
     const message = error instanceof Error ? error.message : "Upload failed";
     return NextResponse.json({ error: message }, { status: 500 });
