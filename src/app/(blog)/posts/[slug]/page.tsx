@@ -25,7 +25,7 @@ export default async function PostPage({
   const formattedDate = formatDate(post.date);
 
   return (
-    <PostLayout title={post.title} date={formattedDate}>
+    <PostLayout title={post.title} date={formattedDate} slug={slug}>
       <div dangerouslySetInnerHTML={{ __html: contentHtml }} />
     </PostLayout>
   );

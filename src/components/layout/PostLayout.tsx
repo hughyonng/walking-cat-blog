@@ -1,14 +1,15 @@
 import { ReactNode } from "react";
 import Link from "next/link";
-import GiscusComments from "@/components/blog/GiscusComments";
+import CommentsArea from "@/components/blog/CommentsArea";
 
 interface PostLayoutProps {
   children: ReactNode;
   title: string;
   date: string;
+  slug: string;
 }
 
-export default function PostLayout({ children, title, date }: PostLayoutProps) {
+export default function PostLayout({ children, title, date, slug }: PostLayoutProps) {
   return (
     <article className="mx-auto max-w-3xl px-6 py-12">
       <Link
@@ -59,7 +60,7 @@ export default function PostLayout({ children, title, date }: PostLayoutProps) {
         {children}
       </div>
 
-      <GiscusComments />
+      <CommentsArea slug={slug} />
     </article>
   );
 }
