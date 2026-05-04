@@ -185,12 +185,12 @@ export function sanitizeSlug(text: string): string {
 }
 
 /**
- * Generate a unique filename slug with YYYYMMDDHHmmss timestamp prefix.
- * Example: "20240321153045-my-post-title"
- * The timestamp guarantees uniqueness even for identical titles.
+ * Generate a unique filename slug with YYYYMMDDHHmmss timestamp prefix
+ * and 3-digit random suffix. Example: "20240321153045-my-post-title-583"
+ * The timestamp + random guarantees uniqueness even for identical titles.
  */
-function generateSlug(title: string, date?: string): string {
-  const now = date ? new Date(date + (date.length === 10 ? "T00:00:00" : "")) : new Date();
+function generateSlug(title: string): string {
+  const now = new Date();
 
   const ts =
     now.getFullYear().toString() +
@@ -200,13 +200,14 @@ function generateSlug(title: string, date?: string): string {
     String(now.getMinutes()).padStart(2, "0") +
     String(now.getSeconds()).padStart(2, "0");
 
-  const titleSlug = sanitizeSlug(title);
-  return `${ts}-${titleSlug}`;
+  const titleSlug = sanitizeSlug(title).slice(0, 20);
+  const rand = Math.floor(Math.random() * 900 + 100);
+  return `${ts}-${titleSlug}-${rand}`;
 }
 
 /** Extract the 14-digit timestamp prefix from a slug, if present. */
 function extractTimestamp(slug: string): string | null {
-  const match = slug.match(/^(\d{14})-([\w-]+)$/);
+  const match = slug.match(/^(\d{14})-/);
   return match ? match[1] : null;
 }
 
@@ -230,34 +231,58 @@ export async function createPost(
   if (!title.trim()) throw new Error("Title is required");
   if (!content.trim()) throw new Error("Content is required");
 
-  const slug = generateSlug(title, date);
+  const slug = generateSlug(title);
   const effectiveStatus = status || "published";
   const type = effectiveStatus === "draft" ? "drafts" : "posts";
-  const repoPath = repoFilePath(type, slug);
   const fileContent = buildPostContent(title, date, description, content, coverImage);
 
   if (isGitHubMode) {
-    const existing = await getContentFile(repoPath);
-    const isUpdate = !!existing;
-    console.log("Writing post to blog-images:", { path: repoPath, title, status: effectiveStatus, isUpdate });
-    await putContentFile(repoPath, fileContent,
-      effectiveStatus === "draft" ? `Save draft: ${title}` : (isUpdate ? `Update post: ${title}` : `Create post: ${title}`),
-      existing?.sha);
+    // Retry with new random suffix if slug collides (same second + same random)
+    let finalSlug = slug;
+    let slugPath = repoFilePath(type, finalSlug);
+    let existing = await getContentFile(slugPath);
+    while (existing) {
+      const rand = Math.floor(Math.random() * 900 + 100);
+      finalSlug = `${slug.replace(/-\d{3}$/, "")}-${rand}`;
+      slugPath = repoFilePath(type, finalSlug);
+      existing = await getContentFile(slugPath);
+    }
+
+    console.log("Writing post to blog-images:", { path: slugPath, title, status: effectiveStatus });
+    await putContentFile(slugPath, fileContent,
+      effectiveStatus === "draft" ? `Save draft: ${title}` : `Create post: ${title}`);
 
     // When publishing, clean up any existing draft
     if (effectiveStatus === "published") {
-      const draftPath = repoFilePath("drafts", slug);
+      const draftPath = repoFilePath("drafts", finalSlug);
       const draftFile = await getContentFile(draftPath);
       if (draftFile) {
-        await deleteContentFile(draftPath, draftFile.sha, `Publish: remove draft ${slug}`);
+        await deleteContentFile(draftPath, draftFile.sha, `Publish: remove draft ${finalSlug}`);
       }
     }
 
-    return { slug, isUpdate };
+    return { slug: finalSlug, isUpdate: false };
   }
 
   const filePath = resolvePostPath(slug, type);
-  const isUpdate = fs.existsSync(filePath);
+  if (fs.existsSync(filePath)) {
+    // Local fs collision — also retry
+    let finalSlug = slug;
+    let finalPath = filePath;
+    while (fs.existsSync(finalPath)) {
+      const rand = Math.floor(Math.random() * 900 + 100);
+      finalSlug = `${slug.replace(/-\d{3}$/, "")}-${rand}`;
+      finalPath = resolvePostPath(finalSlug, type);
+    }
+    fs.writeFileSync(finalPath, fileContent, "utf8");
+    // When publishing, clean up any existing draft
+    if (effectiveStatus === "published") {
+      const draftPath = resolvePostPath(finalSlug, "drafts");
+      if (fs.existsSync(draftPath)) fs.unlinkSync(draftPath);
+    }
+    return { slug: finalSlug, isUpdate: false };
+  }
+
   fs.writeFileSync(filePath, fileContent, "utf8");
 
   // When publishing, clean up any existing draft
@@ -268,7 +293,7 @@ export async function createPost(
     }
   }
 
-  return { slug, isUpdate };
+  return { slug, isUpdate: false };
 }
 
 export async function updatePost(
@@ -300,10 +325,15 @@ export async function updatePost(
   const targetType = newStatus === "draft" ? "drafts" : "posts";
 
   const existingTimestamp = extractTimestamp(slug);
-  const newTitleSlug = sanitizeSlug(newTitle);
-  const newSlug = existingTimestamp
-    ? `${existingTimestamp}-${newTitleSlug}`
-    : generateSlug(newTitle, newDate);
+  const newTitleSlug = sanitizeSlug(newTitle).slice(0, 20);
+
+  // 只在标题真正变化时才重算 slug，否则保留原 slug（含随机后缀）
+  let newSlug = slug;
+  if (data.title && data.title !== existing.data.title) {
+    newSlug = existingTimestamp
+      ? `${existingTimestamp}-${newTitleSlug}`
+      : generateSlug(newTitle);
+  }
   const fileContent = buildPostContent(newTitle, newDate, newDescription, newContent, newCoverImage);
 
   if (isGitHubMode) {
