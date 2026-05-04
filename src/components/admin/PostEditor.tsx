@@ -24,8 +24,15 @@ interface PostEditorProps {
     content: string;
     coverImage?: string;
     order?: number;
+    series?: string;
   };
   source?: "draft" | "published";
+}
+
+/** 从标题中智能识别系列名（《...》） */
+function detectSeriesFromTitle(title: string): string | null {
+  const match = title.match(/《(.+?)》/);
+  return match ? match[1].trim() : null;
 }
 
 /** 从标题中智能识别序号（一、二、三... 或 1、2、3...) */
@@ -65,6 +72,7 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
   const [coverImage, setCoverImage] = useState(initialData?.coverImage || "");
   const [content, setContent] = useState(initialData?.content || "");
   const [order, setOrder] = useState(initialData?.order ?? 0);
+  const [series, setSeries] = useState(initialData?.series || "");
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
@@ -104,11 +112,17 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
     input.click();
   };
 
-  // ── 智能识别标题中的序号 ──
+  // ── 智能识别标题中的系列名和序号 ──
   useEffect(() => {
-    if (!isEdit && order === 0 && title) {
-      const detected = detectOrderFromTitle(title);
-      if (detected !== null) setOrder(detected);
+    if (!isEdit && title) {
+      if (!series) {
+        const detectedSeries = detectSeriesFromTitle(title);
+        if (detectedSeries) setSeries(detectedSeries);
+      }
+      if (order === 0) {
+        const detectedOrder = detectOrderFromTitle(title);
+        if (detectedOrder !== null) setOrder(detectedOrder);
+      }
     }
   }, [title]);
 
@@ -139,7 +153,7 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
       const url = buildSaveUrl(status);
       const method = isEdit ? "PUT" : "POST";
 
-      const body: Record<string, string | number> = { title, date, description, content, status, order };
+      const body: Record<string, string | number> = { title, date, description, content, status, order, series };
       if (coverImage.trim()) body.coverImage = coverImage.trim();
 
       const res = await fetch(url, {
@@ -270,8 +284,24 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
           />
         </div>
 
-        {/* Order + Cover Image row */}
+        {/* Series + Order row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              所属系列
+            </label>
+            <input
+              type="text"
+              value={series}
+              onChange={(e) => setSeries(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
+                focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+              placeholder="例如：EVA 解读"
+            />
+            <p className="mt-1 text-[11px] text-muted/50">
+              同系列文章将按权重排在一起，支持从《》智能识别
+            </p>
+          </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
               排序权重
@@ -287,7 +317,7 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
               title="数字越小越靠前，0 为默认值"
             />
             <p className="mt-1 text-[11px] text-muted/50">
-              数字越小越靠前，支持智能识别
+              同系列内按此排序，支持智能识别
             </p>
           </div>
         </div>

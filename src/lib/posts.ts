@@ -13,6 +13,7 @@ export interface PostMeta {
   description: string;
   coverImage: string;
   order: number;
+  series: string;
 }
 
 export interface Post extends PostMeta {
@@ -73,11 +74,13 @@ function buildPostContent(
   description: string,
   content: string,
   coverImage?: string,
-  order?: number
+  order?: number,
+  series?: string
 ): string {
   const frontmatter: Record<string, string | number> = { title, date, description };
   if (coverImage) frontmatter.coverImage = coverImage;
   if (order && order > 0) frontmatter.order = order;
+  if (series) frontmatter.series = series;
   return matter.stringify(content, frontmatter);
 }
 
@@ -95,6 +98,7 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
       description: data.description,
       coverImage: data.coverImage || getDefaultCoverImage(slug),
       order: data.order ? Number(data.order) : 0,
+      series: (data.series as string) || "",
       content,
     };
   } catch {
@@ -112,6 +116,7 @@ export async function getDraftBySlug(slug: string): Promise<Post | null> {
       description: data.description,
       coverImage: data.coverImage || getDefaultCoverImage(slug),
       order: data.order ? Number(data.order) : 0,
+      series: (data.series as string) || "",
       content,
     };
   } catch {
@@ -133,26 +138,51 @@ export async function getAllPosts(): Promise<PostMeta[]> {
             description: data.description,
             coverImage: data.coverImage || getDefaultCoverImage(slug),
             order: data.order ? Number(data.order) : 0,
+            series: (data.series as string) || "",
           };
         } catch {
           return null;
         }
       })
     )
-  )
-    .filter((p): p is PostMeta => p !== null)
-    .sort((a, b) => {
-      const orderDiff = (a.order || 0) - (b.order || 0);
-      if (orderDiff !== 0) return orderDiff;
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
+  ).filter((p): p is PostMeta => p !== null);
 
-  return posts;
+  // 按 series 分组
+  const seriesMap = new Map<string, PostMeta[]>();
+  const standalone: PostMeta[] = [];
+  for (const post of posts) {
+    if (post.series) {
+      const g = seriesMap.get(post.series);
+      if (g) g.push(post);
+      else seriesMap.set(post.series, [post]);
+    } else {
+      standalone.push(post);
+    }
+  }
+
+  // 每个系列组：内部按 order 升序排列，maxDate = 组内最新文章时间
+  interface Group { posts: PostMeta[]; maxDate: number }
+  const groups: Group[] = [];
+
+  for (const groupPosts of seriesMap.values()) {
+    groupPosts.sort((a, b) => (a.order || 0) - (b.order || 0));
+    const maxDate = Math.max(...groupPosts.map(p => new Date(p.date).getTime()));
+    groups.push({ posts: groupPosts, maxDate });
+  }
+
+  // 无系列文章：每篇独立一组，按日期倒序
+  for (const post of standalone) {
+    groups.push({ posts: [post], maxDate: new Date(post.date).getTime() });
+  }
+
+  // 所有组按 maxDate 倒序排列，再展平
+  groups.sort((a, b) => b.maxDate - a.maxDate);
+  return groups.flatMap(g => g.posts);
 }
 
 export async function getAllDrafts(): Promise<PostMeta[]> {
   const slugs = await getDraftSlugs();
-  const drafts = (
+  const posts = (
     await Promise.all(
       slugs.map(async (slug) => {
         try {
@@ -164,21 +194,43 @@ export async function getAllDrafts(): Promise<PostMeta[]> {
             description: data.description,
             coverImage: data.coverImage || getDefaultCoverImage(slug),
             order: data.order ? Number(data.order) : 0,
+            series: (data.series as string) || "",
           };
         } catch {
           return null;
         }
       })
     )
-  )
-    .filter((p): p is PostMeta => p !== null)
-    .sort((a, b) => {
-      const orderDiff = (a.order || 0) - (b.order || 0);
-      if (orderDiff !== 0) return orderDiff;
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
+  ).filter((p): p is PostMeta => p !== null);
 
-  return drafts;
+  // 按 series 分组（同 getAllPosts）
+  const seriesMap = new Map<string, PostMeta[]>();
+  const standalone: PostMeta[] = [];
+  for (const post of posts) {
+    if (post.series) {
+      const g = seriesMap.get(post.series);
+      if (g) g.push(post);
+      else seriesMap.set(post.series, [post]);
+    } else {
+      standalone.push(post);
+    }
+  }
+
+  interface Group { posts: PostMeta[]; maxDate: number }
+  const groups: Group[] = [];
+
+  for (const groupPosts of seriesMap.values()) {
+    groupPosts.sort((a, b) => (a.order || 0) - (b.order || 0));
+    const maxDate = Math.max(...groupPosts.map(p => new Date(p.date).getTime()));
+    groups.push({ posts: groupPosts, maxDate });
+  }
+
+  for (const post of standalone) {
+    groups.push({ posts: [post], maxDate: new Date(post.date).getTime() });
+  }
+
+  groups.sort((a, b) => b.maxDate - a.maxDate);
+  return groups.flatMap(g => g.posts);
 }
 
 export function sanitizeSlug(text: string): string {
@@ -242,6 +294,7 @@ export async function createPost(
   content: string,
   coverImage?: string,
   order?: number,
+  series?: string,
   status?: "draft" | "published"
 ): Promise<{ slug: string; isUpdate: boolean }> {
   if (!title.trim()) throw new Error("Title is required");
@@ -250,7 +303,7 @@ export async function createPost(
   const slug = generateSlug(title);
   const effectiveStatus = status || "published";
   const type = effectiveStatus === "draft" ? "drafts" : "posts";
-  const fileContent = buildPostContent(title, date, description, content, coverImage, order);
+  const fileContent = buildPostContent(title, date, description, content, coverImage, order, series);
 
   if (isGitHubMode) {
     // Retry with new random suffix if slug collides (same second + same random)
@@ -314,7 +367,7 @@ export async function createPost(
 
 export async function updatePost(
   slug: string,
-  data: { title?: string; date?: string; description?: string; content?: string; coverImage?: string; order?: number; status?: "draft" | "published" },
+  data: { title?: string; date?: string; description?: string; content?: string; coverImage?: string; order?: number; series?: string; status?: "draft" | "published" },
   source: "posts" | "drafts" = "posts"
 ): Promise<{ slug: string }> {
   let existing: { data: Record<string, string>; content: string };
@@ -338,6 +391,7 @@ export async function updatePost(
   const newCoverImage = data.coverImage !== undefined ? data.coverImage : existing.data.coverImage;
   const newContent = data.content !== undefined ? data.content : existing.content;
   const newOrder = data.order !== undefined ? data.order : (existing.data.order ? Number(existing.data.order) : 0);
+  const newSeries = data.series !== undefined ? data.series : (existing.data.series || "");
   const newStatus = data.status || (source === "drafts" ? "draft" : "published");
   const targetType = newStatus === "draft" ? "drafts" : "posts";
 
@@ -351,7 +405,7 @@ export async function updatePost(
       ? `${existingTimestamp}-${newTitleSlug}`
       : generateSlug(newTitle);
   }
-  const fileContent = buildPostContent(newTitle, newDate, newDescription, newContent, newCoverImage, newOrder);
+  const fileContent = buildPostContent(newTitle, newDate, newDescription, newContent, newCoverImage, newOrder, newSeries);
 
   if (isGitHubMode) {
     const writePath = repoFilePath(targetType, newSlug);
