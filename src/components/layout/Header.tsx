@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 
 const navItems = [
   { href: "/", label: "文章" },
+  { href: "/search", label: "搜索" },
   { href: "/about", label: "关于" },
 ];
 

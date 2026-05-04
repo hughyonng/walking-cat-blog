@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import Link from "next/link";
+import GiscusComments from "@/components/blog/GiscusComments";
 
 interface PostLayoutProps {
   children: ReactNode;
@@ -57,6 +58,8 @@ export default function PostLayout({ children, title, date }: PostLayoutProps) {
       ">
         {children}
       </div>
+
+      <GiscusComments />
     </article>
   );
 }
