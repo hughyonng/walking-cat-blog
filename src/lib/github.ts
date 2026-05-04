@@ -1,3 +1,5 @@
+import { Octokit } from "octokit";
+
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_OWNER = process.env.GITHUB_OWNER || "hughyonng";
 const GITHUB_REPO = process.env.GITHUB_REPO || "walking-cat-blog";
@@ -5,14 +7,13 @@ const GITHUB_BRANCH = process.env.GITHUB_BRANCH || "production";
 
 export const isGitHubMode = !!GITHUB_TOKEN;
 
-const BASE_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
+let _octokit: Octokit | null = null;
 
-function headers(): Record<string, string> {
-  return {
-    Authorization: `Bearer ${GITHUB_TOKEN}`,
-    "User-Agent": "walking-cat-blog",
-    Accept: "application/vnd.github.v3+json",
-  };
+function getClient(): Octokit {
+  if (!_octokit) {
+    _octokit = new Octokit({ auth: GITHUB_TOKEN });
+  }
+  return _octokit;
 }
 
 interface GitHubFile {
@@ -24,19 +25,28 @@ interface GitHubFile {
  * Get file content and SHA from the GitHub repository.
  */
 export async function getFile(path: string): Promise<GitHubFile | null> {
-  const url = `${BASE_URL}/contents/${path}?ref=${encodeURIComponent(GITHUB_BRANCH)}`;
-  const res = await fetch(url, { headers: headers() });
+  try {
+    const octokit = getClient();
+    const res = await octokit.rest.repos.getContent({
+      owner: GITHUB_OWNER,
+      repo: GITHUB_REPO,
+      path,
+      ref: GITHUB_BRANCH,
+    });
 
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`GitHub API error (${res.status}): ${await res.text()}`);
+    const data = res.data;
+    if (Array.isArray(data) || data.type !== "file") return null;
+
+    return {
+      content: Buffer.from(data.content, "base64").toString("utf-8"),
+      sha: data.sha,
+    };
+  } catch (err: unknown) {
+    if (err instanceof Error && "status" in err && (err as { status: number }).status === 404) {
+      return null;
+    }
+    throw err;
   }
-
-  const data = await res.json();
-  return {
-    content: Buffer.from(data.content, "base64").toString("utf-8"),
-    sha: data.sha,
-  };
 }
 
 /**
@@ -49,22 +59,35 @@ export async function putFile(
   message: string,
   sha?: string
 ): Promise<void> {
-  const body: Record<string, unknown> = {
+  const octokit = getClient();
+  await octokit.rest.repos.createOrUpdateFileContents({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    path,
     message,
     content: Buffer.from(content, "utf-8").toString("base64"),
     branch: GITHUB_BRANCH,
-  };
-  if (sha) body.sha = sha;
-
-  const res = await fetch(`${BASE_URL}/contents/${path}`, {
-    method: "PUT",
-    headers: { ...headers(), "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    sha,
   });
+}
 
-  if (!res.ok) {
-    throw new Error(`GitHub API error (${res.status}): ${await res.text()}`);
-  }
+/**
+ * Delete a file from the GitHub repository.
+ */
+export async function deleteFile(
+  path: string,
+  sha: string,
+  message: string
+): Promise<void> {
+  const octokit = getClient();
+  await octokit.rest.repos.deleteFile({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    path,
+    message,
+    sha,
+    branch: GITHUB_BRANCH,
+  });
 }
 
 export interface GitHubDirectoryItem {
@@ -77,45 +100,27 @@ export interface GitHubDirectoryItem {
  * List files and directories in a given path.
  */
 export async function listDirectory(path: string): Promise<GitHubDirectoryItem[]> {
-  const url = `${BASE_URL}/contents/${path}?ref=${encodeURIComponent(GITHUB_BRANCH)}`;
-  const res = await fetch(url, { headers: headers() });
+  try {
+    const octokit = getClient();
+    const res = await octokit.rest.repos.getContent({
+      owner: GITHUB_OWNER,
+      repo: GITHUB_REPO,
+      path,
+      ref: GITHUB_BRANCH,
+    });
 
-  if (res.status === 404) return [];
-  if (!res.ok) {
-    throw new Error(`GitHub API error (${res.status}): ${await res.text()}`);
-  }
+    const data = res.data;
+    if (!Array.isArray(data)) return [];
 
-  const data = await res.json();
-  if (!Array.isArray(data)) {
-    throw new Error(`Expected directory at "${path}" but got a file`);
-  }
-
-  return data.map((item: { name: string; type: string; path: string }) => ({
-    name: item.name,
-    type: item.type as "file" | "dir",
-    path: item.path,
-  }));
-}
-
-/**
- * Delete a file from the GitHub repository.
- */
-export async function deleteFile(
-  path: string,
-  sha: string,
-  message: string
-): Promise<void> {
-  const res = await fetch(`${BASE_URL}/contents/${path}`, {
-    method: "DELETE",
-    headers: { ...headers(), "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message,
-      sha,
-      branch: GITHUB_BRANCH,
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`GitHub API error (${res.status}): ${await res.text()}`);
+    return data.map((item: { name: string; type: string; path: string }) => ({
+      name: item.name,
+      type: item.type as "file" | "dir",
+      path: item.path,
+    }));
+  } catch (err: unknown) {
+    if (err instanceof Error && "status" in err && (err as { status: number }).status === 404) {
+      return [];
+    }
+    throw err;
   }
 }
