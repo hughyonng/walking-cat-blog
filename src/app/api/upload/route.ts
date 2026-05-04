@@ -45,9 +45,19 @@ export async function POST(request: NextRequest) {
     const rand = Math.random().toString(36).slice(2, 8);
     const filename = `${date}-${rand}.${ext}`;
 
+    console.log("=== Upload Debug ===");
+    console.log("File name:", file.name);
+    console.log("File size:", file.size);
+    console.log("File type:", file.type);
+    console.log("Target Repo:", `${IMG_OWNER}/${IMG_REPO}`);
+    console.log("Upload Branch:", IMG_BRANCH);
+    console.log("Upload Path:", `${IMG_PATH}/${filename}`);
+
     // Read file as base64
     const buffer = Buffer.from(await file.arrayBuffer());
     const content = buffer.toString("base64");
+    console.log("Base64 length:", content.length);
+    console.log("=== End Debug ===");
 
     const octokit = new Octokit({ auth: githubToken });
     await octokit.rest.repos.createOrUpdateFileContents({
@@ -63,7 +73,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url });
   } catch (error) {
-    console.error("Upload Error:", error);
+    console.error("=== Upload Error ===");
+    console.error("Error:", error);
+    if (error instanceof Error && "response" in error) {
+      const ghErr = error as { response?: { status?: number; data?: unknown } };
+      console.error("GitHub API Status:", ghErr.response?.status);
+      console.error("GitHub API Response:", JSON.stringify(ghErr.response?.data, null, 2));
+    } else if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     const message = error instanceof Error ? error.message : "Upload failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
