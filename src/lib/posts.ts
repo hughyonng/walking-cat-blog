@@ -137,7 +137,7 @@ export async function createPost(
   description: string,
   content: string,
   coverImage?: string
-): Promise<{ slug: string }> {
+): Promise<{ slug: string; isUpdate: boolean }> {
   if (!title.trim()) throw new Error("Title is required");
   if (!content.trim()) throw new Error("Content is required");
 
@@ -147,19 +147,17 @@ export async function createPost(
 
   if (isGitHubMode) {
     const existing = await getContentFile(repoPath);
-    if (existing) throw new Error(`A post with slug "${slug}" already exists`);
-    console.log("Writing post to blog-images:", { path: repoPath, title });
-    await putContentFile(repoPath, fileContent, `Create post: ${title}`);
+    const isUpdate = !!existing;
+    console.log("Writing post to blog-images:", { path: repoPath, title, isUpdate });
+    await putContentFile(repoPath, fileContent, isUpdate ? `Update post: ${title}` : `Create post: ${title}`, existing?.sha);
     console.log("Post written successfully");
-    return { slug };
+    return { slug, isUpdate };
   }
 
   const filePath = resolvePostPath(slug);
-  if (fs.existsSync(filePath)) {
-    throw new Error(`A post with slug "${slug}" already exists`);
-  }
+  const isUpdate = fs.existsSync(filePath);
   fs.writeFileSync(filePath, fileContent, "utf8");
-  return { slug };
+  return { slug, isUpdate };
 }
 
 export async function updatePost(

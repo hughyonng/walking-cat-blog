@@ -44,10 +44,12 @@ export async function POST(request: NextRequest) {
     );
     console.log("Upload success!", result);
 
+    if (result.isUpdate) {
+      return NextResponse.json({ slug: result.slug, message: "文章已更新" }, { status: 200 });
+    }
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create post";
-    const status = message.includes("already exists") ? 409 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
