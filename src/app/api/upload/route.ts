@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { Octokit } from "octokit";
 import { getTokenFromRequest, verifyToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
+const IMG_OWNER = "hughyonng";
+const IMG_REPO = "blog-images";
+const IMG_BRANCH = "main";
+const IMG_PATH = "posts";
 
 export async function POST(request: NextRequest) {
-  // Verify authentication
   const token = await getTokenFromRequest(request);
   if (!token || !(await verifyToken(token))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!BLOB_TOKEN) {
+  const githubToken = process.env.GITHUB_TOKEN;
+  if (!githubToken) {
     return NextResponse.json(
-      { error: "Vercel Blob token not configured" },
+      { error: "GITHUB_TOKEN not configured" },
       { status: 500 }
     );
   }
@@ -28,31 +31,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
     }
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json({ error: "File too large (max 10MB)" }, { status: 400 });
     }
 
-    const blob = await put(file.name, file, {
-      access: "public",
-      addRandomSuffix: true,
-      token: BLOB_TOKEN,
+    // Build filename: YYYY-MM-DD-random.ext
+    const ext = file.name.split(".").pop() || "png";
+    const date = new Date().toISOString().slice(0, 10);
+    const rand = Math.random().toString(36).slice(2, 8);
+    const filename = `${date}-${rand}.${ext}`;
+
+    // Read file as base64
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const content = buffer.toString("base64");
+
+    const octokit = new Octokit({ auth: githubToken });
+    await octokit.rest.repos.createOrUpdateFileContents({
+      owner: IMG_OWNER,
+      repo: IMG_REPO,
+      path: `${IMG_PATH}/${filename}`,
+      message: `Upload image: ${filename}`,
+      content,
+      branch: IMG_BRANCH,
     });
 
-    return NextResponse.json({ url: blob.url });
+    const url = `https://raw.githubusercontent.com/${IMG_OWNER}/${IMG_REPO}/${IMG_BRANCH}/${IMG_PATH}/${filename}`;
+
+    return NextResponse.json({ url });
   } catch (error) {
-    console.error("=== Upload API Error ===");
-    console.error("Error object:", error);
-    if (error instanceof Error) {
-      console.error("Message:", error.message);
-      console.error("Stack:", error.stack);
-    }
+    console.error("Upload Error:", error);
     const message = error instanceof Error ? error.message : "Upload failed";
-    return NextResponse.json({ error: message, detail: String(error) }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
