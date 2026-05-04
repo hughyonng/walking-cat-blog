@@ -6,7 +6,7 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "fallback-secret-do-not-use-in-prod"
 );
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
 
   if (!token) {
