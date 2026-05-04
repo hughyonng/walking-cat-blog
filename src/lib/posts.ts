@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
-import { isGitHubMode, getFile, putFile, deleteFile, listDirectory } from "@/lib/github";
+import { isGitHubMode, getContentFile, putContentFile, deleteContentFile, listContentDirectory } from "@/lib/github";
 
 const postsDirectory = path.join(process.cwd(), "src", "posts");
 
@@ -19,7 +19,7 @@ export interface Post extends PostMeta {
 
 async function readPostFile(slug: string): Promise<{ data: Record<string, string>; content: string }> {
   if (isGitHubMode) {
-    const file = await getFile(`src/posts/${slug}.md`);
+    const file = await getContentFile(`posts/${slug}.md`);
     if (!file) throw new Error(`Post "${slug}" not found`);
     return matter(file.content);
   }
@@ -30,7 +30,7 @@ async function readPostFile(slug: string): Promise<{ data: Record<string, string
 
 export async function getPostSlugs(): Promise<string[]> {
   if (isGitHubMode) {
-    const items = await listDirectory("src/posts");
+    const items = await listContentDirectory("posts");
     return items
       .filter((item) => item.name.endsWith(".md"))
       .map((item) => item.name.replace(/\.md$/, ""));
@@ -41,9 +41,9 @@ export async function getPostSlugs(): Promise<string[]> {
     .map((f) => f.replace(/\.md$/, ""));
 }
 
-/** GitHub repo path for a post file */
+/** Content repo path for a post file (blog-images/posts/) */
 function repoPostPath(slug: string): string {
-  return `src/posts/${slug}.md`;
+  return `posts/${slug}.md`;
 }
 
 /** Build frontmatter + content string */
@@ -146,9 +146,9 @@ export async function createPost(
   const fileContent = buildPostContent(title, date, description, content, coverImage);
 
   if (isGitHubMode) {
-    const existing = await getFile(repoPath);
+    const existing = await getContentFile(repoPath);
     if (existing) throw new Error(`A post with slug "${slug}" already exists`);
-    await putFile(repoPath, fileContent, `Create post: ${title}`);
+    await putContentFile(repoPath, fileContent, `Create post: ${title}`);
     return { slug };
   }
 
@@ -170,7 +170,7 @@ export async function updatePost(
 
   if (isGitHubMode) {
     const repoPath = repoPostPath(slug);
-    const file = await getFile(repoPath);
+    const file = await getContentFile(repoPath);
     if (!file) throw new Error(`Post "${slug}" not found`);
     existing = matter(file.content);
     existingSha = file.sha;
@@ -194,16 +194,16 @@ export async function updatePost(
     const newRepoPath = repoPostPath(newSlug);
 
     if (newSlug !== slug) {
-      const newExisting = await getFile(newRepoPath);
+      const newExisting = await getContentFile(newRepoPath);
       if (newExisting) throw new Error(`A post with slug "${newSlug}" already exists`);
 
-      const oldFile = await getFile(repoPath);
+      const oldFile = await getContentFile(repoPath);
       if (!oldFile) throw new Error(`Post "${slug}" not found`);
 
-      await putFile(newRepoPath, fileContent, `Rename post: ${slug} → ${newSlug}`);
-      await deleteFile(repoPath, oldFile.sha, `Delete old slug: ${slug}`);
+      await putContentFile(newRepoPath, fileContent, `Rename post: ${slug} → ${newSlug}`);
+      await deleteContentFile(repoPath, oldFile.sha, `Delete old slug: ${slug}`);
     } else {
-      await putFile(repoPath, fileContent, `Update post: ${newTitle}`, existingSha);
+      await putContentFile(repoPath, fileContent, `Update post: ${newTitle}`, existingSha);
     }
 
     return { slug: newSlug };
@@ -228,9 +228,9 @@ export async function updatePost(
 export async function deletePost(slug: string): Promise<void> {
   if (isGitHubMode) {
     const repoPath = repoPostPath(slug);
-    const file = await getFile(repoPath);
+    const file = await getContentFile(repoPath);
     if (!file) throw new Error(`Post "${slug}" not found`);
-    await deleteFile(repoPath, file.sha, `Delete post: ${slug}`);
+    await deleteContentFile(repoPath, file.sha, `Delete post: ${slug}`);
     return;
   }
 

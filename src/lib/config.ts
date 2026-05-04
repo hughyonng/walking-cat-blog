@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { isGitHubMode, getFile, putFile } from "@/lib/github";
+import { isGitHubMode, getContentFile, putContentFile } from "@/lib/github";
 
 export interface SiteConfig {
   siteTitle: string;
@@ -10,7 +10,7 @@ export interface SiteConfig {
 }
 
 const configPath = path.join(process.cwd(), "src", "data", "site-config.json");
-const REPO_CONFIG_PATH = "src/data/site-config.json";
+const REPO_CONFIG_PATH = "site-config.json";
 
 const defaultConfig: SiteConfig = {
   siteTitle: "行走的猫",
@@ -27,7 +27,7 @@ export async function getSiteConfig(): Promise<SiteConfig> {
   let config: SiteConfig;
 
   if (isGitHubMode) {
-    const file = await getFile(REPO_CONFIG_PATH);
+    const file = await getContentFile(REPO_CONFIG_PATH);
     if (file) {
       config = { ...defaultConfig, ...JSON.parse(file.content) };
     } else {
@@ -55,9 +55,9 @@ export async function updateSiteConfig(data: Partial<SiteConfig>): Promise<SiteC
   const updated = { ...current, ...data };
 
   if (isGitHubMode) {
-    const existing = await getFile(REPO_CONFIG_PATH);
+    const existing = await getContentFile(REPO_CONFIG_PATH);
     const sha = existing?.sha;
-    await putFile(
+    await putContentFile(
       REPO_CONFIG_PATH,
       JSON.stringify(updated, null, 2),
       "Update site configuration",

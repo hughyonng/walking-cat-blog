@@ -1,8 +1,8 @@
 ---
-title: "AI 编程工具深度评测：Cursor vs Copilot vs Claude"
-date: "2026-03-28"
-description: "对比主流 AI 编程助手，帮你找到最适合自己的工具"
-coverImage: "https://images.unsplash.com/photo-1675557009875-436f2b0be77e?w=800&h=600&fit=crop"
+title: AI 编程工具深度评测：Cursor vs Copilot vs Claude
+date: '2026-03-28'
+description: 对比主流 AI 编程助手，帮你找到最适合自己的工具
+coverImage: 'https://picsum.photos/seed/1777822791894/800/600'
 ---
 
 ## AI 编程工具深度评测：Cursor vs Copilot vs Claude

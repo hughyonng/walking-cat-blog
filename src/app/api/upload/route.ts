@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 const IMG_OWNER = process.env.GITHUB_OWNER || "hughyonng";
 const IMG_REPO = process.env.IMAGE_REPO || "blog-images";
 const IMG_BRANCH = "main";
-const IMG_PATH = "posts";
+const IMG_PATH = "images";
 
 export async function POST(request: NextRequest) {
   const token = await getTokenFromRequest(request);
