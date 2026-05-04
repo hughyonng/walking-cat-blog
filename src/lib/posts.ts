@@ -14,6 +14,7 @@ export interface PostMeta {
   coverImage: string;
   order: number;
   series: string;
+  top: boolean;
 }
 
 export interface Post extends PostMeta {
@@ -75,12 +76,14 @@ function buildPostContent(
   content: string,
   coverImage?: string,
   order?: number,
-  series?: string
+  series?: string,
+  top?: boolean
 ): string {
-  const frontmatter: Record<string, string | number> = { title, date, description };
+  const frontmatter: Record<string, string | number | boolean> = { title, date, description };
   if (coverImage) frontmatter.coverImage = coverImage;
   if (order && order > 0) frontmatter.order = order;
   if (series) frontmatter.series = series;
+  if (top) frontmatter.top = top;
   return matter.stringify(content, frontmatter);
 }
 
@@ -99,6 +102,7 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
       coverImage: data.coverImage || getDefaultCoverImage(slug),
       order: data.order ? Number(data.order) : 0,
       series: (data.series as string) || "",
+      top: (data as any).top === true,
       content,
     };
   } catch {
@@ -117,6 +121,7 @@ export async function getDraftBySlug(slug: string): Promise<Post | null> {
       coverImage: data.coverImage || getDefaultCoverImage(slug),
       order: data.order ? Number(data.order) : 0,
       series: (data.series as string) || "",
+      top: (data as any).top === true,
       content,
     };
   } catch {
@@ -126,7 +131,7 @@ export async function getDraftBySlug(slug: string): Promise<Post | null> {
 
 export async function getAllPosts(): Promise<PostMeta[]> {
   const slugs = await getPostSlugs();
-  const posts = (
+  const raw = (
     await Promise.all(
       slugs.map(async (slug) => {
         try {
@@ -139,6 +144,7 @@ export async function getAllPosts(): Promise<PostMeta[]> {
             coverImage: data.coverImage || getDefaultCoverImage(slug),
             order: data.order ? Number(data.order) : 0,
             series: (data.series as string) || "",
+            top: (data as any).top === true,
           };
         } catch {
           return null;
@@ -147,10 +153,17 @@ export async function getAllPosts(): Promise<PostMeta[]> {
     )
   ).filter((p): p is PostMeta => p !== null);
 
-  // 按 series 分组
+  // ── 第一优先级：置顶文章 ──
+  const topPosts = raw.filter(p => p.top);
+  const regular = raw.filter(p => !p.top);
+
+  // 置顶文章按时间倒序
+  topPosts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // ── 第二优先级：系列聚拢 ──
   const seriesMap = new Map<string, PostMeta[]>();
   const standalone: PostMeta[] = [];
-  for (const post of posts) {
+  for (const post of regular) {
     if (post.series) {
       const g = seriesMap.get(post.series);
       if (g) g.push(post);
@@ -160,7 +173,6 @@ export async function getAllPosts(): Promise<PostMeta[]> {
     }
   }
 
-  // 每个系列组：内部按 order 升序排列，maxDate = 组内最新文章时间
   interface Group { posts: PostMeta[]; maxDate: number }
   const groups: Group[] = [];
 
@@ -170,19 +182,18 @@ export async function getAllPosts(): Promise<PostMeta[]> {
     groups.push({ posts: groupPosts, maxDate });
   }
 
-  // 无系列文章：每篇独立一组，按日期倒序
+  // ── 第三兜底：无系列文章 ──
   for (const post of standalone) {
     groups.push({ posts: [post], maxDate: new Date(post.date).getTime() });
   }
 
-  // 所有组按 maxDate 倒序排列，再展平
   groups.sort((a, b) => b.maxDate - a.maxDate);
-  return groups.flatMap(g => g.posts);
+  return [...topPosts, ...groups.flatMap(g => g.posts)];
 }
 
 export async function getAllDrafts(): Promise<PostMeta[]> {
   const slugs = await getDraftSlugs();
-  const posts = (
+  const raw = (
     await Promise.all(
       slugs.map(async (slug) => {
         try {
@@ -195,6 +206,7 @@ export async function getAllDrafts(): Promise<PostMeta[]> {
             coverImage: data.coverImage || getDefaultCoverImage(slug),
             order: data.order ? Number(data.order) : 0,
             series: (data.series as string) || "",
+            top: (data as any).top === true,
           };
         } catch {
           return null;
@@ -203,10 +215,14 @@ export async function getAllDrafts(): Promise<PostMeta[]> {
     )
   ).filter((p): p is PostMeta => p !== null);
 
-  // 按 series 分组（同 getAllPosts）
+  // 三级排序：置顶 → 系列聚拢 → 无系列按时间
+  const topPosts = raw.filter(p => p.top);
+  const regular = raw.filter(p => !p.top);
+  topPosts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   const seriesMap = new Map<string, PostMeta[]>();
   const standalone: PostMeta[] = [];
-  for (const post of posts) {
+  for (const post of regular) {
     if (post.series) {
       const g = seriesMap.get(post.series);
       if (g) g.push(post);
@@ -230,7 +246,7 @@ export async function getAllDrafts(): Promise<PostMeta[]> {
   }
 
   groups.sort((a, b) => b.maxDate - a.maxDate);
-  return groups.flatMap(g => g.posts);
+  return [...topPosts, ...groups.flatMap(g => g.posts)];
 }
 
 export function sanitizeSlug(text: string): string {
@@ -295,6 +311,7 @@ export async function createPost(
   coverImage?: string,
   order?: number,
   series?: string,
+  top?: boolean,
   status?: "draft" | "published"
 ): Promise<{ slug: string; isUpdate: boolean }> {
   if (!title.trim()) throw new Error("Title is required");
@@ -303,7 +320,7 @@ export async function createPost(
   const slug = generateSlug(title);
   const effectiveStatus = status || "published";
   const type = effectiveStatus === "draft" ? "drafts" : "posts";
-  const fileContent = buildPostContent(title, date, description, content, coverImage, order, series);
+  const fileContent = buildPostContent(title, date, description, content, coverImage, order, series, top);
 
   if (isGitHubMode) {
     // Retry with new random suffix if slug collides (same second + same random)
@@ -367,7 +384,7 @@ export async function createPost(
 
 export async function updatePost(
   slug: string,
-  data: { title?: string; date?: string; description?: string; content?: string; coverImage?: string; order?: number; series?: string; status?: "draft" | "published" },
+  data: { title?: string; date?: string; description?: string; content?: string; coverImage?: string; order?: number; series?: string; top?: boolean; status?: "draft" | "published" },
   source: "posts" | "drafts" = "posts"
 ): Promise<{ slug: string }> {
   let existing: { data: Record<string, string>; content: string };
@@ -392,6 +409,7 @@ export async function updatePost(
   const newContent = data.content !== undefined ? data.content : existing.content;
   const newOrder = data.order !== undefined ? data.order : (existing.data.order ? Number(existing.data.order) : 0);
   const newSeries = data.series !== undefined ? data.series : (existing.data.series || "");
+  const newTop = data.top !== undefined ? data.top : ((existing as any).data.top === true);
   const newStatus = data.status || (source === "drafts" ? "draft" : "published");
   const targetType = newStatus === "draft" ? "drafts" : "posts";
 
@@ -405,7 +423,7 @@ export async function updatePost(
       ? `${existingTimestamp}-${newTitleSlug}`
       : generateSlug(newTitle);
   }
-  const fileContent = buildPostContent(newTitle, newDate, newDescription, newContent, newCoverImage, newOrder, newSeries);
+  const fileContent = buildPostContent(newTitle, newDate, newDescription, newContent, newCoverImage, newOrder, newSeries, newTop);
 
   if (isGitHubMode) {
     const writePath = repoFilePath(targetType, newSlug);

@@ -25,6 +25,7 @@ interface PostEditorProps {
     coverImage?: string;
     order?: number;
     series?: string;
+    top?: boolean;
   };
   source?: "draft" | "published";
 }
@@ -73,6 +74,7 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
   const [content, setContent] = useState(initialData?.content || "");
   const [order, setOrder] = useState(initialData?.order ?? 0);
   const [series, setSeries] = useState(initialData?.series || "");
+  const [top, setTop] = useState(initialData?.top ?? false);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
@@ -153,7 +155,7 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
       const url = buildSaveUrl(status);
       const method = isEdit ? "PUT" : "POST";
 
-      const body: Record<string, string | number> = { title, date, description, content, status, order, series };
+      const body: Record<string, string | number | boolean> = { title, date, description, content, status, order, series, top };
       if (coverImage.trim()) body.coverImage = coverImage.trim();
 
       const res = await fetch(url, {
@@ -320,6 +322,28 @@ export default function PostEditor({ mode, initialData, source }: PostEditorProp
               同系列内按此排序，支持智能识别
             </p>
           </div>
+        </div>
+
+        {/* Top toggle */}
+        <div className="flex items-center gap-3">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={top}
+              onChange={(e) => setTop(e.target.checked)}
+              aria-label="置顶文章"
+              className="sr-only peer"
+            />
+            <div className="w-9 h-5 rounded-full border border-border bg-background
+              peer-checked:bg-amber-500 peer-checked:border-amber-500
+              transition-colors duration-200
+              after:content-[''] after:absolute after:top-0.5 after:left-0.5
+              after:w-4 after:h-4 after:rounded-full after:bg-white
+              after:transition-all after:duration-200
+              peer-checked:after:translate-x-4" />
+          </label>
+          <span className="text-sm text-foreground select-none">置顶</span>
+          <span className="text-[11px] text-muted/50">开启后文章将永远显示在最前面</span>
         </div>
 
         {/* Cover Image */}
