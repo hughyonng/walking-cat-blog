@@ -184,6 +184,32 @@ export function sanitizeSlug(text: string): string {
   return slug || `post-${hash}`;
 }
 
+/**
+ * Generate a unique filename slug with YYYYMMDDHHmmss timestamp prefix.
+ * Example: "20240321153045-my-post-title"
+ * The timestamp guarantees uniqueness even for identical titles.
+ */
+function generateSlug(title: string, date?: string): string {
+  const now = date ? new Date(date + (date.length === 10 ? "T00:00:00" : "")) : new Date();
+
+  const ts =
+    now.getFullYear().toString() +
+    String(now.getMonth() + 1).padStart(2, "0") +
+    String(now.getDate()).padStart(2, "0") +
+    String(now.getHours()).padStart(2, "0") +
+    String(now.getMinutes()).padStart(2, "0") +
+    String(now.getSeconds()).padStart(2, "0");
+
+  const titleSlug = sanitizeSlug(title);
+  return `${ts}-${titleSlug}`;
+}
+
+/** Extract the 14-digit timestamp prefix from a slug, if present. */
+function extractTimestamp(slug: string): string | null {
+  const match = slug.match(/^(\d{14})-([\w-]+)$/);
+  return match ? match[1] : null;
+}
+
 function resolvePostPath(slug: string, type: "posts" | "drafts" = "posts"): string {
   const baseDir = type === "drafts" ? draftsDirectory : postsDirectory;
   const resolved = path.resolve(baseDir, `${slug}.md`);
@@ -204,7 +230,7 @@ export async function createPost(
   if (!title.trim()) throw new Error("Title is required");
   if (!content.trim()) throw new Error("Content is required");
 
-  const slug = sanitizeSlug(title);
+  const slug = generateSlug(title, date);
   const effectiveStatus = status || "published";
   const type = effectiveStatus === "draft" ? "drafts" : "posts";
   const repoPath = repoFilePath(type, slug);
@@ -273,7 +299,11 @@ export async function updatePost(
   const newStatus = data.status || (source === "drafts" ? "draft" : "published");
   const targetType = newStatus === "draft" ? "drafts" : "posts";
 
-  const newSlug = sanitizeSlug(newTitle);
+  const existingTimestamp = extractTimestamp(slug);
+  const newTitleSlug = sanitizeSlug(newTitle);
+  const newSlug = existingTimestamp
+    ? `${existingTimestamp}-${newTitleSlug}`
+    : generateSlug(newTitle, newDate);
   const fileContent = buildPostContent(newTitle, newDate, newDescription, newContent, newCoverImage);
 
   if (isGitHubMode) {
