@@ -26,8 +26,8 @@ export async function verifyToken(token: string): Promise<{ username: string } |
 }
 
 // Verify credentials against config.json (email + password)
-export function verifyCredentials(email: string, password: string): boolean {
-  return verifyAdminCredentials(email, password);
+export async function verifyCredentials(email: string, password: string): Promise<boolean> {
+  return await verifyAdminCredentials(email, password);
 }
 
 export async function setAuthCookie(token: string): Promise<Response> {

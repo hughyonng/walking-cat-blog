@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const config = getSiteConfig();
+  const config = await getSiteConfig();
   return {
     title: `${config.siteTitle} — 关于 Web 开发与设计`,
     description: config.siteSubtitle,

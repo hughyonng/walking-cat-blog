@@ -67,6 +67,36 @@ export async function putFile(
   }
 }
 
+export interface GitHubDirectoryItem {
+  name: string;
+  type: "file" | "dir";
+  path: string;
+}
+
+/**
+ * List files and directories in a given path.
+ */
+export async function listDirectory(path: string): Promise<GitHubDirectoryItem[]> {
+  const url = `${BASE_URL}/contents/${path}?ref=${encodeURIComponent(GITHUB_BRANCH)}`;
+  const res = await fetch(url, { headers: headers() });
+
+  if (res.status === 404) return [];
+  if (!res.ok) {
+    throw new Error(`GitHub API error (${res.status}): ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  if (!Array.isArray(data)) {
+    throw new Error(`Expected directory at "${path}" but got a file`);
+  }
+
+  return data.map((item: { name: string; type: string; path: string }) => ({
+    name: item.name,
+    type: item.type as "file" | "dir",
+    path: item.path,
+  }));
+}
+
 /**
  * Delete a file from the GitHub repository.
  */

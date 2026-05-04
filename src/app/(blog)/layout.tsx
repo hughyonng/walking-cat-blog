@@ -1,12 +1,12 @@
 import MainLayout from "@/components/layout/MainLayout";
 import { getSiteConfig } from "@/lib/config";
 
-export default function BlogLayout({
+export default async function BlogLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { siteTitle } = getSiteConfig();
+  const { siteTitle } = await getSiteConfig();
 
   return (
     <>

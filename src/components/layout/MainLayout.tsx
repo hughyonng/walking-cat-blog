@@ -2,8 +2,8 @@ import { ReactNode } from "react";
 import { getSiteConfig } from "@/lib/config";
 import Header from "./Header";
 
-export default function MainLayout({ children }: { children: ReactNode }) {
-  const { siteTitle } = getSiteConfig();
+export default async function MainLayout({ children }: { children: ReactNode }) {
+  const { siteTitle } = await getSiteConfig();
 
   return (
     <>

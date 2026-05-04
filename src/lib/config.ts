@@ -21,16 +21,25 @@ const defaultConfig: SiteConfig = {
 
 let cachedConfig: SiteConfig | null = null;
 
-export function getSiteConfig(): SiteConfig {
+export async function getSiteConfig(): Promise<SiteConfig> {
   if (cachedConfig) return cachedConfig;
 
   let config: SiteConfig;
 
-  try {
-    const raw = fs.readFileSync(configPath, "utf8");
-    config = { ...defaultConfig, ...JSON.parse(raw) };
-  } catch {
-    config = { ...defaultConfig };
+  if (isGitHubMode) {
+    const file = await getFile(REPO_CONFIG_PATH);
+    if (file) {
+      config = { ...defaultConfig, ...JSON.parse(file.content) };
+    } else {
+      config = { ...defaultConfig };
+    }
+  } else {
+    try {
+      const raw = fs.readFileSync(configPath, "utf8");
+      config = { ...defaultConfig, ...JSON.parse(raw) };
+    } catch {
+      config = { ...defaultConfig };
+    }
   }
 
   // Environment variables override file config (critical for Vercel deployment)
@@ -42,7 +51,7 @@ export function getSiteConfig(): SiteConfig {
 }
 
 export async function updateSiteConfig(data: Partial<SiteConfig>): Promise<SiteConfig> {
-  const current = getSiteConfig();
+  const current = await getSiteConfig();
   const updated = { ...current, ...data };
 
   if (isGitHubMode) {
@@ -64,10 +73,10 @@ export async function updateSiteConfig(data: Partial<SiteConfig>): Promise<SiteC
   return updated;
 }
 
-export function verifyAdminCredentials(
+export async function verifyAdminCredentials(
   email: string,
   password: string
-): boolean {
-  const config = getSiteConfig();
+): Promise<boolean> {
+  const config = await getSiteConfig();
   return email === config.adminEmail && password === config.adminPassword;
 }

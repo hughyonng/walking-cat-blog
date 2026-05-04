@@ -6,7 +6,7 @@ import { getSiteConfig, updateSiteConfig } from "@/lib/config";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const config = getSiteConfig();
+  const config = await getSiteConfig();
   // Never expose password to client
   const { adminPassword, ...safe } = config;
   return NextResponse.json(safe);
@@ -29,7 +29,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { siteTitle, siteSubtitle, adminEmail, currentPassword, newPassword } = body;
 
-    const currentConfig = getSiteConfig();
+    const currentConfig = await getSiteConfig();
 
     // If changing password, verify current password
     if (newPassword) {

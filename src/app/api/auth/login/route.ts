@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!verifyCredentials(email, password)) {
+    if (!(await verifyCredentials(email, password))) {
       return NextResponse.json(
         { error: "邮箱或密码错误" },
         { status: 401 }

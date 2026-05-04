@@ -5,7 +5,7 @@ import BlogPostCard from "@/components/blog/BlogPostCard";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const config = getSiteConfig();
+  const config = await getSiteConfig();
   const posts = await getAllPosts();
 
   return (

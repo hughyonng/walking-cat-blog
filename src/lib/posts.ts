@@ -1,12 +1,9 @@
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
-import { isGitHubMode, getFile, putFile, deleteFile } from "@/lib/github";
+import { isGitHubMode, getFile, putFile, deleteFile, listDirectory } from "@/lib/github";
 
 const postsDirectory = path.join(process.cwd(), "src", "posts");
-
-/** Vercel serverless environment has a read-only filesystem */
-const isReadonlyFS = !!process.env.VERCEL;
 
 export interface PostMeta {
   slug: string;
@@ -20,13 +17,24 @@ export interface Post extends PostMeta {
   content: string;
 }
 
-function readPostFile(slug: string): { data: Record<string, string>; content: string } {
+async function readPostFile(slug: string): Promise<{ data: Record<string, string>; content: string }> {
+  if (isGitHubMode) {
+    const file = await getFile(`src/posts/${slug}.md`);
+    if (!file) throw new Error(`Post "${slug}" not found`);
+    return matter(file.content);
+  }
   const fullPath = path.join(postsDirectory, `${slug}.md`);
   const fileContents = fs.readFileSync(fullPath, "utf8");
   return matter(fileContents);
 }
 
-export function getPostSlugs(): string[] {
+export async function getPostSlugs(): Promise<string[]> {
+  if (isGitHubMode) {
+    const items = await listDirectory("src/posts");
+    return items
+      .filter((item) => item.name.endsWith(".md"))
+      .map((item) => item.name.replace(/\.md$/, ""));
+  }
   return fs
     .readdirSync(postsDirectory)
     .filter((f) => f.endsWith(".md"))
@@ -57,7 +65,7 @@ function getDefaultCoverImage(slug: string): string {
 
 export async function getPostBySlug(slug: string): Promise<Post | null> {
   try {
-    const { data, content } = readPostFile(slug);
+    const { data, content } = await readPostFile(slug);
     return {
       slug,
       title: data.title,
@@ -72,22 +80,25 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
 }
 
 export async function getAllPosts(): Promise<PostMeta[]> {
-  const slugs = getPostSlugs();
-  const posts = slugs
-    .map((slug) => {
-      try {
-        const { data } = readPostFile(slug);
-        return {
-          slug,
-          title: data.title,
-          date: data.date,
-          description: data.description,
-          coverImage: data.coverImage || getDefaultCoverImage(slug),
-        };
-      } catch {
-        return null;
-      }
-    })
+  const slugs = await getPostSlugs();
+  const posts = (
+    await Promise.all(
+      slugs.map(async (slug) => {
+        try {
+          const { data } = await readPostFile(slug);
+          return {
+            slug,
+            title: data.title,
+            date: data.date,
+            description: data.description,
+            coverImage: data.coverImage || getDefaultCoverImage(slug),
+          };
+        } catch {
+          return null;
+        }
+      })
+    )
+  )
     .filter((p): p is PostMeta => p !== null)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -131,7 +142,6 @@ export async function createPost(
   if (!content.trim()) throw new Error("Content is required");
 
   const slug = sanitizeSlug(title);
-  const filePath = resolvePostPath(slug);
   const repoPath = repoPostPath(slug);
   const fileContent = buildPostContent(title, date, description, content, coverImage);
 
@@ -142,7 +152,7 @@ export async function createPost(
     return { slug };
   }
 
-  if (isReadonlyFS) throw new Error("Cannot create posts in serverless environment (Vercel)");
+  const filePath = resolvePostPath(slug);
   if (fs.existsSync(filePath)) {
     throw new Error(`A post with slug "${slug}" already exists`);
   }
@@ -154,7 +164,22 @@ export async function updatePost(
   slug: string,
   data: { title?: string; date?: string; description?: string; content?: string; coverImage?: string }
 ): Promise<{ slug: string }> {
-  const existing = readPostFile(slug);
+  let existing: { data: Record<string, string>; content: string };
+
+  let existingSha: string | undefined;
+
+  if (isGitHubMode) {
+    const repoPath = repoPostPath(slug);
+    const file = await getFile(repoPath);
+    if (!file) throw new Error(`Post "${slug}" not found`);
+    existing = matter(file.content);
+    existingSha = file.sha;
+  } else {
+    const filePath = resolvePostPath(slug);
+    const fileContents = fs.readFileSync(filePath, "utf8");
+    existing = matter(fileContents);
+  }
+
   const newTitle = data.title || existing.data.title;
   const newDate = data.date || existing.data.date;
   const newDescription = data.description || existing.data.description;
@@ -178,16 +203,12 @@ export async function updatePost(
       await putFile(newRepoPath, fileContent, `Rename post: ${slug} → ${newSlug}`);
       await deleteFile(repoPath, oldFile.sha, `Delete old slug: ${slug}`);
     } else {
-      const oldFile = await getFile(repoPath);
-      if (!oldFile) throw new Error(`Post "${slug}" not found`);
-
-      await putFile(repoPath, fileContent, `Update post: ${newTitle}`, oldFile.sha);
+      await putFile(repoPath, fileContent, `Update post: ${newTitle}`, existingSha);
     }
 
     return { slug: newSlug };
   }
 
-  if (isReadonlyFS) throw new Error("Cannot edit posts in serverless environment (Vercel)");
   const oldPath = resolvePostPath(slug);
   const newPath = resolvePostPath(newSlug);
 
@@ -213,7 +234,6 @@ export async function deletePost(slug: string): Promise<void> {
     return;
   }
 
-  if (isReadonlyFS) throw new Error("Cannot delete posts in serverless environment (Vercel)");
   const filePath = resolvePostPath(slug);
   if (!fs.existsSync(filePath)) {
     throw new Error(`Post "${slug}" not found`);
