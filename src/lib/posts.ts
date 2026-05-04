@@ -4,6 +4,7 @@ import matter from "gray-matter";
 import { isGitHubMode, getContentFile, putContentFile, deleteContentFile, listContentDirectory } from "@/lib/github";
 
 const postsDirectory = path.join(process.cwd(), "src", "posts");
+const draftsDirectory = path.join(process.cwd(), "src", "drafts");
 
 export interface PostMeta {
   slug: string;
@@ -17,13 +18,14 @@ export interface Post extends PostMeta {
   content: string;
 }
 
-async function readPostFile(slug: string): Promise<{ data: Record<string, string>; content: string }> {
+async function readPostFile(slug: string, type: "posts" | "drafts" = "posts"): Promise<{ data: Record<string, string>; content: string }> {
   if (isGitHubMode) {
-    const file = await getContentFile(`posts/${slug}.md`);
+    const file = await getContentFile(`${type}/${slug}.md`);
     if (!file) throw new Error(`Post "${slug}" not found`);
     return matter(file.content);
   }
-  const fullPath = path.join(postsDirectory, `${slug}.md`);
+  const baseDir = type === "drafts" ? draftsDirectory : postsDirectory;
+  const fullPath = path.join(baseDir, `${slug}.md`);
   const fileContents = fs.readFileSync(fullPath, "utf8");
   return matter(fileContents);
 }
@@ -41,9 +43,26 @@ export async function getPostSlugs(): Promise<string[]> {
     .map((f) => f.replace(/\.md$/, ""));
 }
 
-/** Content repo path for a post file (blog-images/posts/) */
-function repoPostPath(slug: string): string {
-  return `posts/${slug}.md`;
+export async function getDraftSlugs(): Promise<string[]> {
+  if (isGitHubMode) {
+    const items = await listContentDirectory("drafts");
+    return items
+      .filter((item) => item.name.endsWith(".md"))
+      .map((item) => item.name.replace(/\.md$/, ""));
+  }
+  try {
+    return fs
+      .readdirSync(draftsDirectory)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => f.replace(/\.md$/, ""));
+  } catch {
+    return [];
+  }
+}
+
+/** Content repo path for a post or draft file (blog-images/posts/ or blog-images/drafts/) */
+function repoFilePath(type: "posts" | "drafts", slug: string): string {
+  return `${type}/${slug}.md`;
 }
 
 /** Build frontmatter + content string */
@@ -65,7 +84,23 @@ function getDefaultCoverImage(slug: string): string {
 
 export async function getPostBySlug(slug: string): Promise<Post | null> {
   try {
-    const { data, content } = await readPostFile(slug);
+    const { data, content } = await readPostFile(slug, "posts");
+    return {
+      slug,
+      title: data.title,
+      date: data.date,
+      description: data.description,
+      coverImage: data.coverImage || getDefaultCoverImage(slug),
+      content,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function getDraftBySlug(slug: string): Promise<Post | null> {
+  try {
+    const { data, content } = await readPostFile(slug, "drafts");
     return {
       slug,
       title: data.title,
@@ -105,6 +140,32 @@ export async function getAllPosts(): Promise<PostMeta[]> {
   return posts;
 }
 
+export async function getAllDrafts(): Promise<PostMeta[]> {
+  const slugs = await getDraftSlugs();
+  const drafts = (
+    await Promise.all(
+      slugs.map(async (slug) => {
+        try {
+          const { data } = await readPostFile(slug, "drafts");
+          return {
+            slug,
+            title: data.title,
+            date: data.date,
+            description: data.description,
+            coverImage: data.coverImage || getDefaultCoverImage(slug),
+          };
+        } catch {
+          return null;
+        }
+      })
+    )
+  )
+    .filter((p): p is PostMeta => p !== null)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return drafts;
+}
+
 export function sanitizeSlug(text: string): string {
   // Short hash as fallback for pure-non-ASCII titles
   const hash = Math.abs(
@@ -123,9 +184,10 @@ export function sanitizeSlug(text: string): string {
   return slug || `post-${hash}`;
 }
 
-function resolvePostPath(slug: string): string {
-  const resolved = path.resolve(postsDirectory, `${slug}.md`);
-  if (!resolved.startsWith(path.resolve(postsDirectory))) {
+function resolvePostPath(slug: string, type: "posts" | "drafts" = "posts"): string {
+  const baseDir = type === "drafts" ? draftsDirectory : postsDirectory;
+  const resolved = path.resolve(baseDir, `${slug}.md`);
+  if (!resolved.startsWith(path.resolve(baseDir))) {
     throw new Error("Invalid slug: path traversal detected");
   }
   return resolved;
@@ -136,46 +198,69 @@ export async function createPost(
   date: string,
   description: string,
   content: string,
-  coverImage?: string
+  coverImage?: string,
+  status?: "draft" | "published"
 ): Promise<{ slug: string; isUpdate: boolean }> {
   if (!title.trim()) throw new Error("Title is required");
   if (!content.trim()) throw new Error("Content is required");
 
   const slug = sanitizeSlug(title);
-  const repoPath = repoPostPath(slug);
+  const effectiveStatus = status || "published";
+  const type = effectiveStatus === "draft" ? "drafts" : "posts";
+  const repoPath = repoFilePath(type, slug);
   const fileContent = buildPostContent(title, date, description, content, coverImage);
 
   if (isGitHubMode) {
     const existing = await getContentFile(repoPath);
     const isUpdate = !!existing;
-    console.log("Writing post to blog-images:", { path: repoPath, title, isUpdate });
-    await putContentFile(repoPath, fileContent, isUpdate ? `Update post: ${title}` : `Create post: ${title}`, existing?.sha);
-    console.log("Post written successfully");
+    console.log("Writing post to blog-images:", { path: repoPath, title, status: effectiveStatus, isUpdate });
+    await putContentFile(repoPath, fileContent,
+      effectiveStatus === "draft" ? `Save draft: ${title}` : (isUpdate ? `Update post: ${title}` : `Create post: ${title}`),
+      existing?.sha);
+
+    // When publishing, clean up any existing draft
+    if (effectiveStatus === "published") {
+      const draftPath = repoFilePath("drafts", slug);
+      const draftFile = await getContentFile(draftPath);
+      if (draftFile) {
+        await deleteContentFile(draftPath, draftFile.sha, `Publish: remove draft ${slug}`);
+      }
+    }
+
     return { slug, isUpdate };
   }
 
-  const filePath = resolvePostPath(slug);
+  const filePath = resolvePostPath(slug, type);
   const isUpdate = fs.existsSync(filePath);
   fs.writeFileSync(filePath, fileContent, "utf8");
+
+  // When publishing, clean up any existing draft
+  if (effectiveStatus === "published") {
+    const draftPath = resolvePostPath(slug, "drafts");
+    if (fs.existsSync(draftPath)) {
+      fs.unlinkSync(draftPath);
+    }
+  }
+
   return { slug, isUpdate };
 }
 
 export async function updatePost(
   slug: string,
-  data: { title?: string; date?: string; description?: string; content?: string; coverImage?: string }
+  data: { title?: string; date?: string; description?: string; content?: string; coverImage?: string; status?: "draft" | "published" },
+  source: "posts" | "drafts" = "posts"
 ): Promise<{ slug: string }> {
   let existing: { data: Record<string, string>; content: string };
-
   let existingSha: string | undefined;
 
   if (isGitHubMode) {
-    const repoPath = repoPostPath(slug);
-    const file = await getContentFile(repoPath);
-    if (!file) throw new Error(`Post "${slug}" not found`);
+    const readPath = repoFilePath(source, slug);
+    const file = await getContentFile(readPath);
+    if (!file) throw new Error(`Post "${slug}" not found in ${source}`);
     existing = matter(file.content);
     existingSha = file.sha;
   } else {
-    const filePath = resolvePostPath(slug);
+    const filePath = resolvePostPath(slug, source);
     const fileContents = fs.readFileSync(filePath, "utf8");
     existing = matter(fileContents);
   }
@@ -185,38 +270,43 @@ export async function updatePost(
   const newDescription = data.description || existing.data.description;
   const newCoverImage = data.coverImage !== undefined ? data.coverImage : existing.data.coverImage;
   const newContent = data.content !== undefined ? data.content : existing.content;
+  const newStatus = data.status || (source === "drafts" ? "draft" : "published");
+  const targetType = newStatus === "draft" ? "drafts" : "posts";
 
   const newSlug = sanitizeSlug(newTitle);
   const fileContent = buildPostContent(newTitle, newDate, newDescription, newContent, newCoverImage);
 
   if (isGitHubMode) {
-    const repoPath = repoPostPath(slug);
-    const newRepoPath = repoPostPath(newSlug);
+    const writePath = repoFilePath(targetType, newSlug);
+    console.log("Updating post in blog-images:", { from: slug, to: newSlug, source, target: targetType });
 
-    console.log("Updating post in blog-images:", { from: slug, to: newSlug });
+    if (newSlug !== slug || targetType !== source) {
+      // Slug changed or status changed — move the file
+      const existingTarget = await getContentFile(writePath);
+      if (existingTarget && newSlug !== slug) {
+        throw new Error(`A post with slug "${newSlug}" already exists`);
+      }
 
-    if (newSlug !== slug) {
-      const newExisting = await getContentFile(newRepoPath);
-      if (newExisting) throw new Error(`A post with slug "${newSlug}" already exists`);
-
-      const oldFile = await getContentFile(repoPath);
+      const oldFile = await getContentFile(repoFilePath(source, slug));
       if (!oldFile) throw new Error(`Post "${slug}" not found`);
 
-      await putContentFile(newRepoPath, fileContent, `Rename post: ${slug} → ${newSlug}`);
-      await deleteContentFile(repoPath, oldFile.sha, `Delete old slug: ${slug}`);
+      await putContentFile(writePath, fileContent,
+        `Move post: ${slug} → ${newSlug} (${source} → ${targetType})`);
+      await deleteContentFile(repoFilePath(source, slug), oldFile.sha,
+        `Delete old: ${slug} from ${source}`);
     } else {
-      await putContentFile(repoPath, fileContent, `Update post: ${newTitle}`, existingSha);
+      await putContentFile(writePath, fileContent, `Update post: ${newTitle}`, existingSha);
     }
 
     console.log("Post update successful");
     return { slug: newSlug };
   }
 
-  const oldPath = resolvePostPath(slug);
-  const newPath = resolvePostPath(newSlug);
+  const oldPath = resolvePostPath(slug, source);
+  const newPath = resolvePostPath(newSlug, targetType);
 
-  if (newSlug !== slug) {
-    if (fs.existsSync(newPath)) {
+  if (newSlug !== slug || targetType !== source) {
+    if (fs.existsSync(newPath) && newSlug !== slug) {
       throw new Error(`A post with slug "${newSlug}" already exists`);
     }
     fs.writeFileSync(newPath, fileContent, "utf8");
@@ -228,20 +318,20 @@ export async function updatePost(
   return { slug: newSlug };
 }
 
-export async function deletePost(slug: string): Promise<void> {
+export async function deletePost(slug: string, source: "posts" | "drafts" = "posts"): Promise<void> {
   if (isGitHubMode) {
-    const repoPath = repoPostPath(slug);
+    const repoPath = repoFilePath(source, slug);
     console.log("Deleting post from blog-images:", { path: repoPath });
     const file = await getContentFile(repoPath);
-    if (!file) throw new Error(`Post "${slug}" not found`);
+    if (!file) throw new Error(`Post "${slug}" not found in ${source}`);
     await deleteContentFile(repoPath, file.sha, `Delete post: ${slug}`);
     console.log("Post deleted successfully");
     return;
   }
 
-  const filePath = resolvePostPath(slug);
+  const filePath = resolvePostPath(slug, source);
   if (!fs.existsSync(filePath)) {
-    throw new Error(`Post "${slug}" not found`);
+    throw new Error(`Post "${slug}" not found in ${source}`);
   }
   fs.unlinkSync(filePath);
 }

@@ -24,11 +24,13 @@ interface PostEditorProps {
     content: string;
     coverImage?: string;
   };
+  source?: "draft" | "published";
 }
 
-export default function PostEditor({ mode, initialData }: PostEditorProps) {
+export default function PostEditor({ mode, initialData, source }: PostEditorProps) {
   const router = useRouter();
   const isEdit = mode === "edit";
+  const isDraft = source === "draft";
 
   const [title, setTitle] = useState(initialData?.title || "");
   const [date, setDate] = useState(
@@ -78,7 +80,17 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
     input.click();
   };
 
-  const handleSave = async () => {
+  const buildSaveUrl = (forStatus: "draft" | "published") => {
+    if (isEdit) {
+      // Query param tells the API where to read the existing content from
+      const sourceParam = isDraft ? "drafts" : forStatus === "draft" ? "posts" : undefined;
+      const qs = sourceParam ? `?source=${sourceParam}` : "";
+      return `/api/posts/${encodeURIComponent(initialData!.slug)}${qs}`;
+    }
+    return "/api/posts";
+  };
+
+  const doSave = async (status: "draft" | "published") => {
     if (!title.trim()) {
       setError("请输入文章标题");
       return;
@@ -92,12 +104,10 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
     setSaving(true);
 
     try {
-      const url = isEdit
-        ? `/api/posts/${initialData!.slug}`
-        : "/api/posts";
+      const url = buildSaveUrl(status);
       const method = isEdit ? "PUT" : "POST";
 
-      const body: Record<string, string> = { title, date, description, content };
+      const body: Record<string, string> = { title, date, description, content, status };
       if (coverImage.trim()) body.coverImage = coverImage.trim();
 
       const res = await fetch(url, {
@@ -125,12 +135,23 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
     }
   };
 
+  const handlePublish = () => doSave("published");
+  const handleSaveDraft = () => doSave("draft");
+
+  const publishLabel = isEdit ? "更新文章" : "发布文章";
+  const draftLabel = isEdit && isDraft ? "保存草稿" : "保存为草稿";
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       {/* Page header */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
           {isEdit ? "编辑文章" : "写新文章"}
+          {isDraft && (
+            <span className="ml-3 text-sm font-normal text-amber-500 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-0.5 rounded-full">
+              草稿
+            </span>
+          )}
         </h1>
         <button
           type="button"
@@ -276,7 +297,7 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
         <div className="flex items-center gap-4 pt-2">
           <button
             type="button"
-            onClick={handleSave}
+            onClick={handlePublish}
             disabled={saving || syncing}
             className="px-5 py-2.5 rounded-lg bg-accent text-white text-sm font-medium
               hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -290,11 +311,18 @@ export default function PostEditor({ mode, initialData }: PostEditorProps) {
               </>
             ) : saving ? (
               "保存中..."
-            ) : isEdit ? (
-              "更新文章"
             ) : (
-              "发布文章"
+              publishLabel
             )}
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            disabled={saving || syncing}
+            className="px-5 py-2.5 rounded-lg border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 text-sm font-medium
+              hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {draftLabel}
           </button>
           <button
             type="button"

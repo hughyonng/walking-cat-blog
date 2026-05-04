@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, date, description, content, coverImage } = body;
+    const { title, date, description, content, coverImage, status } = body;
 
     if (!title || !content) {
       return NextResponse.json(
@@ -34,13 +34,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Starting upload...", { title });
+    console.log("Starting upload...", { title, status });
     const result = await createPost(
       title,
       date || new Date().toISOString().split("T")[0],
       description || "",
       content,
-      coverImage
+      coverImage,
+      status
     );
     console.log("Upload success!", result);
 

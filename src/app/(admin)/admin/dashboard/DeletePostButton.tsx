@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 
 export default function DeletePostButton({
   slug,
+  title,
+  source,
 }: {
   slug: string;
   title: string;
+  source?: "posts" | "drafts";
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -21,7 +24,8 @@ export default function DeletePostButton({
 
     setDeleting(true);
     try {
-      const res = await fetch(`/api/posts/${slug}`, { method: "DELETE" });
+      const qs = source === "drafts" ? "?source=drafts" : "";
+      const res = await fetch(`/api/posts/${slug}${qs}`, { method: "DELETE" });
       if (!res.ok) throw new Error("删除失败");
       router.refresh();
     } catch {
