@@ -9,7 +9,9 @@ export async function GET() {
   const config = await getSiteConfig();
   // Never expose password to client
   const { adminPassword, ...safe } = config;
-  return NextResponse.json(safe);
+  return NextResponse.json(safe, {
+    headers: { "Cache-Control": "no-store, must-revalidate" },
+  });
 }
 
 export async function PUT(request: NextRequest) {
@@ -60,7 +62,9 @@ export async function PUT(request: NextRequest) {
 
     // Never expose password
     const { adminPassword: _, ...safe } = updated;
-    return NextResponse.json(safe);
+    return NextResponse.json(safe, {
+      headers: { "Cache-Control": "no-store, must-revalidate" },
+    });
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }

@@ -10,10 +10,8 @@ export interface SiteConfig {
   about: {
     introduction: string;
     github: string;
-    zhihu: string;
     email: string;
     x: string;
-    skills: string[];
     avatar: string;
   };
 }
@@ -29,10 +27,8 @@ const defaultConfig: SiteConfig = {
   about: {
     introduction: "",
     github: "",
-    zhihu: "",
     email: "",
     x: "",
-    skills: [],
     avatar: "",
   },
 };
@@ -73,6 +69,10 @@ export async function getSiteConfig(): Promise<SiteConfig> {
   if (process.env.ADMIN_EMAIL) config.adminEmail = process.env.ADMIN_EMAIL;
   if (process.env.ADMIN_PASSWORD) config.adminPassword = process.env.ADMIN_PASSWORD;
 
+  // Strip legacy fields that may linger in stored JSON
+  delete (config.about as any).zhihu;
+  delete (config.about as any).skills;
+
   cachedConfig = config;
   return config;
 }
@@ -84,6 +84,10 @@ export async function updateSiteConfig(data: Partial<SiteConfig>): Promise<SiteC
     ...data,
     about: data.about ? { ...current.about, ...data.about } : current.about,
   };
+
+  // Strip any legacy fields before persisting
+  delete (updated.about as any).zhihu;
+  delete (updated.about as any).skills;
 
   if (isGitHubMode) {
     const existing = await getContentFile(REPO_CONFIG_PATH);

@@ -1,5 +1,5 @@
 import { getSiteConfig } from "@/lib/config";
-import { GitHubIcon, ZhihuIcon, XIcon, EmailIcon } from "@/components/blog/PlatformIcons";
+import { GitHubIcon, XIcon, EmailIcon } from "@/components/blog/PlatformIcons";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,6 @@ export default async function AboutPage() {
 
   const socialLinks = [
     { href: about.github, icon: GitHubIcon, label: "GitHub", show: !!about.github },
-    { href: about.zhihu, icon: ZhihuIcon, label: "知乎", show: !!about.zhihu },
     { href: about.x, icon: XIcon, label: "X", show: !!about.x },
     { href: `mailto:${about.email}`, icon: EmailIcon, label: "邮箱", show: !!about.email },
   ].filter((l) => l.show);
@@ -44,25 +43,6 @@ export default async function AboutPage() {
         </div>
       )}
 
-      {/* Skills cloud */}
-      {about.skills.length > 0 && (
-        <div className="mt-10">
-          <h2 className="text-lg font-semibold text-foreground mb-4">技能</h2>
-          <div className="flex flex-wrap gap-2">
-            {about.skills.map((skill) => (
-              <span
-                key={skill}
-                className="inline-flex px-3 py-1.5 rounded-full text-sm font-medium
-                  bg-accent/10 text-accent border border-accent/20 transition-colors
-                  hover:bg-accent/20"
-              >
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Social links */}
       {socialLinks.length > 0 && (
         <div className="mt-10">
@@ -87,7 +67,7 @@ export default async function AboutPage() {
       )}
 
       {/* Empty state: nothing configured */}
-      {!about.avatar && paragraphs.length === 0 && about.skills.length === 0 && socialLinks.length === 0 && (
+      {!about.avatar && paragraphs.length === 0 && socialLinks.length === 0 && (
         <p className="mt-10 text-muted text-center py-12">
           还没有填写个人信息，请前往后台设置。
         </p>

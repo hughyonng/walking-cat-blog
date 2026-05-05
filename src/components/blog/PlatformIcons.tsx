@@ -10,14 +10,6 @@ export function GitHubIcon({ className }: IconProps) {
   );
 }
 
-export function ZhihuIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M5.721 0C2.512 0 0 2.512 0 5.721v12.558C0 21.488 2.512 24 5.721 24h12.558c3.209 0 5.721-2.512 5.721-5.721V5.721C24 2.512 21.488 0 18.279 0H5.721zm2.093 7.535h1.674v1.674H7.814v3.721h1.209l1.395 1.395-.93.93-.465-.466v-1.86H7.814v-5.395zm4.744 0h1.674v1.674h-1.674v3.721h1.209l1.395 1.395-.93.93-.465-.466v-1.86h-1.209v-5.395zM11.07 9.21v1.953h.837V9.209h-.837z" />
-    </svg>
-  );
-}
-
 export function XIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>

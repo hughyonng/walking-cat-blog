@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import SkillTagInput from "./SkillTagInput";
 
 interface SiteConfig {
   siteTitle: string;
@@ -11,10 +10,8 @@ interface SiteConfig {
   about: {
     introduction: string;
     github: string;
-    zhihu: string;
     email: string;
     x: string;
-    skills: string[];
     avatar: string;
   };
 }
@@ -168,12 +165,16 @@ export default function SettingsForm() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ about: config.about }),
+        cache: "no-store",
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "保存失败");
       }
-      setMessage({ type: "success", text: "关于我已保存" });
+      // 用服务端返回的最新数据刷新本地状态，防止回滚
+      const updated = await res.json();
+      setConfig(updated);
+      setMessage({ type: "success", text: "关于已保存" });
       router.refresh();
     } catch (err) {
       setMessage({
@@ -198,7 +199,9 @@ export default function SettingsForm() {
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "上传失败");
-        updateAbout({ avatar: data.url });
+        // 加时间戳防止浏览器缓存旧头像
+        const cacheBustUrl = data.url.includes("?") ? `${data.url}&t=${Date.now()}` : `${data.url}?t=${Date.now()}`;
+        updateAbout({ avatar: cacheBustUrl });
       } catch (err) {
         setMessage({
           type: "error",
@@ -382,29 +385,25 @@ export default function SettingsForm() {
       {/* About Section */}
       <section>
         <h2 className="text-base font-semibold text-foreground mb-4 pb-3 border-b border-border/60">
-          关于我
+          关于
         </h2>
         <form onSubmit={handleSaveAbout} className="space-y-5">
           <div>
-            <label htmlFor="introduction" className="block text-sm font-medium text-foreground mb-1.5">
-              个人介绍
-            </label>
             <textarea
               id="introduction"
-              rows={4}
+              rows={5}
               value={config.about.introduction}
               onChange={(e) => updateAbout({ introduction: e.target.value })}
               className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
                 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow resize-y"
               placeholder="写一段个人简介，支持多行文本"
             />
-            <p className="mt-1.5 text-xs text-muted">支持多行文本，每段之间用空行分隔</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="aboutGithub" className="block text-sm font-medium text-foreground mb-1.5">
-                GitHub 链接
+                GitHub
               </label>
               <input
                 id="aboutGithub"
@@ -417,22 +416,8 @@ export default function SettingsForm() {
               />
             </div>
             <div>
-              <label htmlFor="aboutZhihu" className="block text-sm font-medium text-foreground mb-1.5">
-                知乎链接
-              </label>
-              <input
-                id="aboutZhihu"
-                type="text"
-                value={config.about.zhihu}
-                onChange={(e) => updateAbout({ zhihu: e.target.value })}
-                placeholder="https://zhihu.com/people/username"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
-                  focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
-              />
-            </div>
-            <div>
               <label htmlFor="aboutX" className="block text-sm font-medium text-foreground mb-1.5">
-                X (Twitter) 链接
+                X (Twitter)
               </label>
               <input
                 id="aboutX"
@@ -446,7 +431,7 @@ export default function SettingsForm() {
             </div>
             <div>
               <label htmlFor="aboutEmail" className="block text-sm font-medium text-foreground mb-1.5">
-                公开联系邮箱
+                联系邮箱
               </label>
               <input
                 id="aboutEmail"
@@ -457,7 +442,6 @@ export default function SettingsForm() {
                 className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm
                   focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
               />
-              <p className="mt-1.5 text-xs text-muted">此邮箱将公开显示在关于页面</p>
             </div>
           </div>
 
@@ -496,17 +480,6 @@ export default function SettingsForm() {
                 <span className="text-xs text-muted">预览</span>
               </div>
             )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
-              技能标签
-            </label>
-            <SkillTagInput
-              tags={config.about.skills}
-              onChange={(skills) => updateAbout({ skills })}
-            />
-            <p className="mt-1.5 text-xs text-muted">输入技能名称后按 Enter 添加，点击 × 删除</p>
           </div>
 
           <div>
