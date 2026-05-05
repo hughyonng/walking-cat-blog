@@ -27,6 +27,7 @@ export default function SettingsForm() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -186,27 +187,35 @@ export default function SettingsForm() {
     }
   };
 
-  const handleAvatarUpload = () => {
+  const handleAvatarUpload = async () => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
+      setUploading(true);
+      setMessage(null);
       const formData = new FormData();
       formData.append("file", file);
       try {
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "上传失败");
+        if (!res.ok) {
+          console.error("Upload API error detail:", data);
+          throw new Error(data.error || "上传失败");
+        }
         // 加时间戳防止浏览器缓存旧头像
         const cacheBustUrl = data.url.includes("?") ? `${data.url}&t=${Date.now()}` : `${data.url}?t=${Date.now()}`;
         updateAbout({ avatar: cacheBustUrl });
+        setMessage({ type: "success", text: "头像已上传，点击「保存关于我」生效" });
       } catch (err) {
         setMessage({
           type: "error",
           text: `头像上传失败: ${err instanceof Error ? err.message : "未知错误"}`,
         });
+      } finally {
+        setUploading(false);
       }
     };
     input.click();
@@ -461,10 +470,12 @@ export default function SettingsForm() {
               <button
                 type="button"
                 onClick={handleAvatarUpload}
+                disabled={uploading}
                 className="shrink-0 px-4 py-2.5 rounded-lg border border-border text-sm font-medium
-                  text-muted hover:text-foreground hover:border-accent/30 transition-colors"
+                  text-muted hover:text-foreground hover:border-accent/30 transition-colors
+                  disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                上传头像
+                {uploading ? "上传中..." : "上传头像"}
               </button>
             </div>
             {config.about.avatar && (
@@ -489,7 +500,7 @@ export default function SettingsForm() {
               className="px-5 py-2 rounded-lg bg-accent text-white text-sm font-medium
                 hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {saving ? "保存中..." : "保存关于我"}
+              {saving ? "保存中..." : "保存关于"}
             </button>
           </div>
         </form>
