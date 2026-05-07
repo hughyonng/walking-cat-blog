@@ -66,7 +66,7 @@ export default async function SeriesPage({
           >
             <article className="bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-xl transition-shadow duration-300 relative group-hover:z-20">
               {/* Cover image — 4:3 aspect like homepage */}
-              <div className="relative aspect-[4/3] bg-muted/10 rounded-t-2xl">
+              <div className="relative aspect-square bg-muted/10 rounded-t-2xl">
                 <img
                   src={post.coverImage}
                   alt=""

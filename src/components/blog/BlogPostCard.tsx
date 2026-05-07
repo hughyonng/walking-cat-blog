@@ -24,7 +24,7 @@ export default function BlogPostCard({ post, index = 0 }: BlogPostCardProps) {
       <Link href={`/posts/${post.slug}`} className="group block">
         <article className="bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-xl transition-shadow duration-300 relative group-hover:z-20">
           {/* Cover Image */}
-          <div className="relative aspect-[4/3] bg-muted/10 rounded-t-2xl">
+          <div className="relative aspect-square bg-muted/10 rounded-t-2xl">
             <img
               src={post.coverImage || `https://picsum.photos/seed/${post.slug}/800/600`}
               alt={post.title}
