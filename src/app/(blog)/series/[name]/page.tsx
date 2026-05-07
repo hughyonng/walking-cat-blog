@@ -70,7 +70,7 @@ export default async function SeriesPage({
                 <img
                   src={post.coverImage}
                   alt=""
-                  className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-200"
+                  className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-150"
                   loading="lazy"
                 />
               </div>
