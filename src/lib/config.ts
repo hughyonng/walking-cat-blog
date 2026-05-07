@@ -33,11 +33,7 @@ const defaultConfig: SiteConfig = {
   },
 };
 
-let cachedConfig: SiteConfig | null = null;
-
 export async function getSiteConfig(): Promise<SiteConfig> {
-  if (cachedConfig) return cachedConfig;
-
   let config: SiteConfig;
 
   if (isGitHubMode) {
@@ -73,7 +69,6 @@ export async function getSiteConfig(): Promise<SiteConfig> {
   delete (config.about as any).zhihu;
   delete (config.about as any).skills;
 
-  cachedConfig = config;
   return config;
 }
 
@@ -104,7 +99,6 @@ export async function updateSiteConfig(data: Partial<SiteConfig>): Promise<SiteC
     fs.writeFileSync(configPath, JSON.stringify(updated, null, 2), "utf8");
   }
 
-  cachedConfig = updated;
   return updated;
 }
 
