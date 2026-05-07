@@ -1,5 +1,5 @@
 import { getAllPosts } from "@/lib/posts";
-import { formatDate } from "@/lib/utils";
+import { formatOrdinalDay } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -21,7 +21,7 @@ export default async function SeriesPage({
   if (seriesPosts.length === 0) notFound();
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
+    <div className="mx-auto max-w-7xl px-6 py-12 sm:py-16 lg:px-8">
       {/* Back link */}
       <Link
         href="/"
@@ -53,44 +53,36 @@ export default async function SeriesPage({
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
           {seriesName}
         </h1>
-        <p className="mt-2 text-sm text-muted">共 {seriesPosts.length} 篇文章</p>
+        <p className="mt-2 text-sm text-muted">共 {seriesPosts.length} 篇</p>
       </header>
 
-      {/* Article list */}
-      <div className="space-y-6">
+      {/* Cards grid — match homepage card grid */}
+      <div className="grid gap-5 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {seriesPosts.map((post, i) => (
           <Link
             key={post.slug}
             href={`/posts/${post.slug}`}
-            className="block group"
+            className="group block"
           >
-            <article className="flex items-start gap-4 sm:gap-6 p-4 sm:p-5 rounded-xl border border-border/50 hover:border-accent/20 hover:bg-muted/5 transition-all">
-              {/* Order number */}
-              <span className="hidden sm:flex w-10 h-10 shrink-0 items-center justify-center rounded-lg bg-muted/10 text-sm font-bold text-muted group-hover:text-accent transition-colors">
-                {post.order || i + 1}
-              </span>
-
-              {/* Thumbnail */}
-              <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-lg overflow-hidden bg-muted/10">
+            <article className="bg-card rounded-2xl overflow-hidden border border-border/50 shadow-sm hover:shadow-xl transition-shadow duration-300">
+              {/* Cover image — 4:3 aspect like homepage */}
+              <div className="relative overflow-hidden aspect-[4/3] bg-muted/10">
                 <img
                   src={post.coverImage}
-                  alt={post.title}
-                  className="w-full h-full object-cover"
+                  alt=""
+                  className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                   loading="lazy"
                 />
               </div>
 
-              {/* Text */}
-              <div className="min-w-0 flex-1">
-                <h2 className="text-base font-semibold text-foreground group-hover:text-accent transition-colors leading-snug line-clamp-2">
-                  {post.title}
-                </h2>
-                <p className="mt-1 text-sm text-muted leading-relaxed line-clamp-2">
-                  {post.description}
-                </p>
-                <time className="inline-block mt-2 text-xs text-muted/60">
-                  {formatDate(post.date)}
-                </time>
+              {/* Sequence number + date */}
+              <div className="p-4 sm:p-5">
+                <div className="text-xl sm:text-2xl font-bold text-foreground tracking-tight leading-none">
+                  {post.order || i + 1}
+                </div>
+                <div className="mt-1.5 text-xs sm:text-sm text-muted/60 leading-none">
+                  {formatOrdinalDay(post.date)}
+                </div>
               </div>
             </article>
           </Link>
