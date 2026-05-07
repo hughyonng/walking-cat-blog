@@ -6,7 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import ImageExtension from "@tiptap/extension-image";
 import LinkExtension from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
-import { mdToHtml, isHtmlContent } from "@/lib/render-content";
+import { contentToHtml } from "@/lib/render-content";
 
 interface RichEditorProps {
   content: string;
@@ -21,7 +21,7 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
   const [imageUrl, setImageUrl] = useState("");
 
   // Convert legacy markdown to HTML for TipTap
-  const initialHtml = isHtmlContent(content) ? content : mdToHtml(content);
+  const initialHtml = contentToHtml(content);
 
   const [mounted, setMounted] = useState(false);
 

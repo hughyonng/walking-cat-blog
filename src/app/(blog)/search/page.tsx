@@ -1,9 +1,15 @@
-import { getAllPosts } from "@/lib/posts";
+import { getAllPosts, getPostBySlug } from "@/lib/posts";
 import SearchClient from "@/components/blog/SearchClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function SearchPage() {
-  const posts = await getAllPosts();
+  const metas = await getAllPosts();
+  const posts = await Promise.all(
+    metas.map(async (meta) => {
+      const full = await getPostBySlug(meta.slug);
+      return { ...meta, content: full?.content || "" };
+    })
+  );
   return <SearchClient posts={posts} />;
 }

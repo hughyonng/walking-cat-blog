@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@giscus/react": "^3.1.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tiptap/extension-image": "^3.22.5",
     "@tiptap/extension-link": "^3.22.5",
@@ -16,10 +17,12 @@
     "@tiptap/react": "^3.22.5",
     "@tiptap/starter-kit": "^3.22.5",
     "framer-motion": "^12.38.0",
+    "googleapis": "^171.4.0",
     "gray-matter": "^4.0.3",
     "jose": "^6.2.3",
     "next": "16.2.4",
     "next-mdx-remote": "^6.0.0",
+    "pdf-parse": "^2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "remark": "^15.0.1",

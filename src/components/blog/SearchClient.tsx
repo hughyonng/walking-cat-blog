@@ -5,8 +5,12 @@ import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import type { PostMeta } from "@/lib/posts";
 
+interface SearchPost extends PostMeta {
+  content: string;
+}
+
 interface Props {
-  posts: PostMeta[];
+  posts: SearchPost[];
 }
 
 export default function SearchClient({ posts }: Props) {
@@ -16,7 +20,8 @@ export default function SearchClient({ posts }: Props) {
     ? posts.filter(
         (p) =>
           p.title.toLowerCase().includes(query.toLowerCase()) ||
-          p.description.toLowerCase().includes(query.toLowerCase())
+          p.description.toLowerCase().includes(query.toLowerCase()) ||
+          p.content.toLowerCase().includes(query.toLowerCase())
       )
     : posts;
 
